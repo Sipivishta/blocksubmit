@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>BlockSubmit</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .card {
+            background: rgba(255,255,255,0.05);
+            padding: 40px;
+            border-radius: 16px;
+            backdrop-filter: blur(10px);
+            width: 320px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+
+        .title {
+            font-size: 26px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #38bdf8;
+        }
+
+        .subtitle {
+            font-size: 13px;
+            color: #94a3b8;
+            margin-bottom: 20px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: none;
+            outline: none;
+        }
+
+        button {
+            width: 60%; /* 👈 centered smaller button */
+            padding: 12px;
+            background: #38bdf8;
+            border: none;
+            border-radius: 8px;
+            color: black;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background: #0ea5e9;
+        }
+
+        .msg {
+            margin-top: 15px;
+            color: #f87171;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="card">
+
+    <!-- 🔥 PROJECT NAME -->
+    <div class="title">BlockSubmit</div>
+    <div class="subtitle">Secure Assignment Submission System</div>
+
+    <form method="POST">
+        <input type="text" name="username" placeholder="Username" required>
+        <input type="password" name="password" placeholder="Password" required>
+
+        <!-- CENTERED BUTTON -->
+        <div style="display:flex; justify-content:center;">
+            <button type="submit">Login</button>
+        </div>
+    </form>
+
+    <p class="msg">{{ msg }}</p>
+
+</div>
+
+</body>
+</html>

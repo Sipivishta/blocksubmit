@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Teacher</title>
+<style>
+body{background:#0f172a;color:white;font-family:Arial;margin:0;}
+.nav{background:#1e293b;padding:15px;display:flex;justify-content:space-between;}
+.container{padding:30px;}
+.card{background:#1e293b;padding:20px;border-radius:10px;margin-bottom:15px;}
+.hash{word-break:break-all;color:#38bdf8;}
+button{padding:10px;background:#22c55e;border:none;border-radius:5px;}
+.msg{margin-top:10px;}
+</style>
+</head>
+<body>
+
+<div class="nav">
+<h3>Teacher Dashboard</h3>
+<a href="/logout" style="color:white;">Logout</a>
+</div>
+
+<div class="container">
+
+<h2>Blockchain Records</h2>
+
+{% for block in chain %}
+<div class="card">
+<p><b>Block:</b> {{ block.index }}</p>
+<p>Student: {{ block.student_id }}</p>
+<p>Course: {{ block.course_id }}</p>
+<p>Time: {{ block.timestamp }}</p>
+<p class="hash">Hash: {{ block.file_hash }}</p>
+</div>
+{% endfor %}
+
+<h3>Verify Assignment</h3>
+
+<form method="POST" enctype="multipart/form-data">
+<input type="file" name="file" required>
+<button>Verify</button>
+</form>
+
+<p class="msg">{{ msg }}</p>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Student</title>
+<style>
+body{background:#0f172a;color:white;font-family:Arial;margin:0;}
+.nav{background:#1e293b;padding:15px;display:flex;justify-content:space-between;}
+.container{display:flex;gap:30px;justify-content:center;margin-top:50px;}
+.card{background:#1e293b;padding:25px;border-radius:10px;width:300px;}
+input,button{width:100%;margin:10px 0;padding:10px;border:none;border-radius:5px;}
+button{background:#38bdf8;cursor:pointer;}
+.msg{text-align:center;margin-top:20px;}
+</style>
+</head>
+<body>
+
+<div class="nav">
+<h3>Student Dashboard</h3>
+<a href="/logout" style="color:white;">Logout</a>
+</div>
+
+<div class="container">
+
+<div class="card">
+<h3>Upload Assignment</h3>
+<form method="POST" enctype="multipart/form-data">
+<input name="student_id" placeholder="Student ID" required>
+<input name="course_id" placeholder="Course ID" required>
+<input type="file" name="file" required>
+<button>Upload</button>
+</form>
+</div>
+
+<div class="card">
+<h3>Verify Assignment</h3>
+<form method="POST" action="/verify_student" enctype="multipart/form-data">
+<input type="file" name="file" required>
+<button>Verify</button>
+</form>
+</div>
+
+</div>
+
+<p class="msg">{{ msg }}</p>
+<p class="msg">{{ verify_msg }}</p>
+
+</body>
+</html>

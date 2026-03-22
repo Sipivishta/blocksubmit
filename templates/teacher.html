@@ -28,60 +28,68 @@
         .header {
             display: flex;
             justify-content: space-between;
-            align-items: center;
             padding: 20px 50px;
+            align-items: center;
         }
 
         .logo {
-            font-size: 24px;
+            font-size: 26px;
             font-weight: 900;
             letter-spacing: 3px;
-            text-shadow: 0 0 5px rgba(255,255,255,0.3);
+            text-shadow:
+                0 0 6px rgba(255,255,255,0.6),
+                0 0 12px rgba(0,255,255,0.3);
         }
 
         .logout-btn {
             background: #ff4d4d;
             padding: 10px 20px;
-            border-radius: 8px;
+            border-radius: 10px;
             border: none;
+            color: white;
             cursor: pointer;
             font-weight: bold;
-            color: white;
+            transition: 0.3s;
         }
 
         .logout-btn:hover {
-            background: #e63946;
+            background: #ff1a1a;
         }
 
         /* MAIN */
-        .main {
-            padding: 30px 60px;
+        .container {
+            padding: 40px 70px;
         }
 
-        .title {
-            font-size: 32px;
-            margin-bottom: 20px;
+        h2 {
+            margin-bottom: 25px;
+            font-size: 30px;
         }
 
-        .section-title {
-            margin: 20px 0 10px;
-            font-size: 20px;
-            opacity: 0.8;
+        /* DROPDOWN */
+        select {
+            padding: 12px;
+            border-radius: 10px;
+            background: #111;
+            color: white;
+            border: none;
+            margin-bottom: 25px;
         }
 
-        /* BLOCK GRID */
+        /* GRID */
         .grid {
             display: flex;
             flex-wrap: wrap;
             gap: 20px;
         }
 
+        /* CARD */
         .card {
-            flex: 1;
-            min-width: 280px;
             background: rgba(255,255,255,0.05);
             padding: 20px;
             border-radius: 18px;
+            width: 300px;
+
             backdrop-filter: blur(15px);
             box-shadow: 0 0 25px rgba(0,0,0,0.8);
             transition: 0.3s;
@@ -93,7 +101,6 @@
 
         .card p {
             margin: 6px 0;
-            font-size: 14px;
         }
 
         .hash {
@@ -104,50 +111,55 @@
 
         /* VERIFY BOX */
         .verify-box {
-            margin-top: 30px;
-            max-width: 400px;
+            margin-top: 50px;
+            max-width: 420px;
             background: rgba(255,255,255,0.05);
             padding: 25px;
             border-radius: 18px;
+
             backdrop-filter: blur(15px);
-            box-shadow: 0 0 25px rgba(0,0,0,0.8);
+            box-shadow: 0 0 30px rgba(0,0,0,0.8);
         }
 
-        input {
+        .verify-box h3 {
+            margin-bottom: 10px;
+        }
+
+        input, button {
             width: 100%;
             padding: 12px;
             margin: 10px 0;
-            border-radius: 8px;
+            border-radius: 10px;
             border: none;
+        }
+
+        input {
             background: #e2e8f0;
             color: black;
         }
 
-        .verify-btn {
-            width: 100%;
-            padding: 12px;
+        button {
             background: white;
-            border: none;
-            border-radius: 10px;
             font-weight: bold;
             cursor: pointer;
+            transition: 0.3s;
         }
 
-        .verify-btn:hover {
+        button:hover {
             background: #ddd;
+            transform: scale(1.02);
         }
 
         #result {
-            margin-top: 10px;
-            font-weight: bold;
             text-align: center;
+            font-weight: bold;
+            margin-top: 10px;
         }
     </style>
 </head>
 
 <body>
 
-<!-- HEADER -->
 <div class="header">
     <div class="logo">BLOCKSUBMIT</div>
 
@@ -156,23 +168,35 @@
     </a>
 </div>
 
-<!-- MAIN -->
-<div class="main">
+<div class="container">
 
-    <div class="title">👨‍🏫 Teacher Dashboard</div>
+    <h2>👨‍🏫 Teacher Dashboard</h2>
 
-    <div class="section-title">📦 Blockchain Records</div>
+    <!-- COURSE FILTER -->
+    <form method="POST">
+        <select name="course_id" onchange="this.form.submit()">
+            <option value="">All Courses</option>
+            {% for c in courses %}
+                <option value="{{ c }}" {% if selected_course == c %}selected{% endif %}>
+                    {{ c }}
+                </option>
+            {% endfor %}
+        </select>
+    </form>
 
+    <!-- BLOCKCHAIN -->
     <div class="grid">
         {% for block in chain %}
-            <div class="card">
-                <p><b>Block:</b> {{ block.index }}</p>
-                <p><b>Student:</b> {{ block.student_id }}</p>
-                <p><b>Course:</b> {{ block.course_id }}</p>
-                <p><b>Version:</b> {{ block.version }}</p>
-                <p><b>Timestamp:</b> {{ block.timestamp }}</p>
-                <p class="hash"><b>Hash:</b> {{ block.file_hash }}</p>
-            </div>
+        <div class="card">
+            <p><b>Student:</b> {{ block.student_id }}</p>
+            <p><b>Course:</b> {{ block.course_id }}</p>
+            <p><b>Version:</b> {{ block.version }}</p>
+            <p><b>Time:</b> {{ block.timestamp }}</p>
+
+            <p class="hash">
+                <b>Hash:</b><br>{{ block.file_hash }}
+            </p>
+        </div>
         {% endfor %}
     </div>
 
@@ -181,8 +205,18 @@
         <h3>🔍 Verify Submission</h3>
 
         <form id="verifyForm">
+
+            <input type="text" name="student_id" placeholder="Student ID" required>
+
+            <select name="course_id" required>
+                {% for c in courses %}
+                <option value="{{ c }}">{{ c }}</option>
+                {% endfor %}
+            </select>
+
             <input type="file" name="file" required>
-            <button class="verify-btn" type="submit">Verify File</button>
+
+            <button type="submit">Verify File</button>
         </form>
 
         <p id="result"></p>
@@ -202,16 +236,13 @@ document.getElementById("verifyForm").onsubmit = async function(e) {
     });
 
     let data = await res.json();
-
     let result = document.getElementById("result");
 
-    if (data.status === "original") {
-        result.innerHTML = "✅ FILE IS ORIGINAL";
-        result.style.color = "#4ade80";
-    } else {
-        result.innerHTML = "❌ FILE IS TAMPERED";
-        result.style.color = "#f87171";
-    }
+    result.innerHTML = data.message;
+
+    if (data.status === "original") result.style.color = "#4ade80";
+    else if (data.status === "updated") result.style.color = "#facc15";
+    else result.style.color = "#f87171";
 };
 </script>
 

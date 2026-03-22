@@ -1,51 +1,65 @@
 from flask import Flask, request, jsonify
-import hashlib, json
-from datetime import datetime
+import hashlib
+import json
+import datetime
+import os
 
 app = Flask(__name__)
 
 FILE_NAME = "blockchain_5001.json"
 
-try:
+# Load blockchain
+if os.path.exists(FILE_NAME):
     with open(FILE_NAME) as f:
         blockchain = json.load(f)
-except:
+else:
     blockchain = []
 
-@app.route('/add_block', methods=['POST'])
-def add_block():
-    data = request.json
-
-    student_id = data.get("student_id")
-    course_id = data.get("course_id")
-    file_hash = data.get("file_hash")
-
-    if not student_id or not course_id or not file_hash:
-        return jsonify({"error": "Missing data"}), 400
-
-    previous_hash = blockchain[-1]["hash"] if blockchain else "0"
-
-    block = {
-        "index": len(blockchain) + 1,
-        "student_id": student_id,
-        "course_id": course_id,
-        "file_hash": file_hash,
-        "timestamp": str(datetime.now()),
-        "previous_hash": previous_hash
-    }
-
-    block_string = json.dumps(block, sort_keys=True).encode()
-    block["hash"] = hashlib.sha256(block_string).hexdigest()
-
-    blockchain.append(block)
-
+def save_blockchain():
     with open(FILE_NAME, "w") as f:
         json.dump(blockchain, f, indent=4)
 
-    return jsonify(block)
 
-@app.route('/chain', methods=['GET'])
+@app.route("/add_block", methods=["POST"])
+def add_block():
+    data = request.json
+
+    student_id = data["student_id"]
+    course_id = data["course_id"]
+
+    # 🔥 VERSION LOGIC
+    version = 1
+    for block in blockchain:
+        if (block["data"]["student_id"] == student_id and 
+            block["data"]["course_id"] == course_id):
+            version += 1
+
+    new_block = {
+        "index": len(blockchain) + 1,
+        "timestamp": str(datetime.datetime.now()),
+        "data": {
+            "student_id": student_id,
+            "course_id": course_id,
+            "hash": data["hash"],
+            "version": version
+        },
+        "previous_hash": blockchain[-1]["hash"] if blockchain else "0"
+    }
+
+    new_block["hash"] = hashlib.sha256(
+        json.dumps(new_block, sort_keys=True).encode()
+    ).hexdigest()
+
+    blockchain.append(new_block)
+    save_blockchain()
+
+    return jsonify(new_block)
+
+
+@app.route("/get_chain", methods=["GET"])
 def get_chain():
-    return jsonify(blockchain)
+    return jsonify({"chain": blockchain})
 
-app.run(port=5001, debug=True)
+
+if __name__ == "__main__":
+    app.run(port=5001, debug=True)

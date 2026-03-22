@@ -5,69 +5,54 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-FILE_NAME = "blockchain_5000.json"
-
-# ---------------- LOAD BLOCKCHAIN ----------------
-try:
-    with open(FILE_NAME, "r") as f:
-        blockchain = json.load(f)
-except:
-    blockchain = []
-
-# ---------------- SAVE BLOCKCHAIN ----------------
-def save_chain():
-    with open(FILE_NAME, "w") as f:
-        json.dump(blockchain, f, indent=4)
+BLOCKCHAIN_FILE = "blockchain_5000.json"
 
 
-# ---------------- ADD BLOCK ----------------
-@app.route('/add_block', methods=['POST'])
+def load_chain():
+    try:
+        with open(BLOCKCHAIN_FILE, "r") as f:
+            return json.load(f)
+    except:
+        return []
+
+
+def save_chain(chain):
+    with open(BLOCKCHAIN_FILE, "w") as f:
+        json.dump(chain, f, indent=4)
+
+
+@app.route("/add_block", methods=["POST"])
 def add_block():
     data = request.json
 
-    student_id = data.get("student_id")
-    course_id = data.get("course_id")
-    file_hash = data.get("file_hash")
+    chain = load_chain()
 
-    if not student_id or not course_id or not file_hash:
-        return jsonify({"error": "Missing data"}), 400
+    previous_hash = chain[-1]["hash"] if chain else "0"
 
-    # ✅ SAFE previous hash (fixes your error)
-    if blockchain and isinstance(blockchain[-1], dict) and "hash" in blockchain[-1]:
-        previous_hash = blockchain[-1]["hash"]
-    else:
-        previous_hash = "0"
-
-    # Create block
     block = {
-        "index": len(blockchain) + 1,
-        "student_id": student_id,
-        "course_id": course_id,
-        "file_hash": file_hash,
+        "index": len(chain) + 1,
         "timestamp": str(datetime.now()),
+        "student_id": data["student_id"],
+        "course_id": data["course_id"],
+        "file_hash": data["file_hash"],
+        "version": data.get("version", 1),
         "previous_hash": previous_hash
     }
 
-    # Generate block hash
-    block_string = json.dumps(block, sort_keys=True).encode()
-    block["hash"] = hashlib.sha256(block_string).hexdigest()
+    block_string = json.dumps(block, sort_keys=True)
+    block["hash"] = hashlib.sha256(block_string.encode()).hexdigest()
 
-    # Add to chain
-    blockchain.append(block)
-    save_chain()
+    chain.append(block)
+    save_chain(chain)
 
-    return jsonify({
-        "message": "Block added successfully",
-        "block": block
-    })
+    return jsonify({"message": "Block added"})
 
 
-# ---------------- GET BLOCKCHAIN ----------------
-@app.route('/chain', methods=['GET'])
+@app.route("/chain", methods=["GET"])
 def get_chain():
-    return jsonify(blockchain)
+    chain = load_chain()
+    return jsonify({"chain": chain, "length": len(chain)})
 
 
-# ---------------- RUN ----------------
 if __name__ == "__main__":
     app.run(port=5000, debug=True)

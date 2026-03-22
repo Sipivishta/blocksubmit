@@ -1,48 +1,219 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Teacher</title>
-<style>
-body{background:#0f172a;color:white;font-family:Arial;margin:0;}
-.nav{background:#1e293b;padding:15px;display:flex;justify-content:space-between;}
-.container{padding:30px;}
-.card{background:#1e293b;padding:20px;border-radius:10px;margin-bottom:15px;}
-.hash{word-break:break-all;color:#38bdf8;}
-button{padding:10px;background:#22c55e;border:none;border-radius:5px;}
-.msg{margin-top:10px;}
-</style>
+    <title>Teacher Dashboard</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(-45deg, #000000, #111111, #1a1a1a, #000000);
+            background-size: 400% 400%;
+            animation: gradientMove 12s ease infinite;
+            color: white;
+        }
+
+        @keyframes gradientMove {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* HEADER */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 50px;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 900;
+            letter-spacing: 3px;
+            text-shadow: 0 0 5px rgba(255,255,255,0.3);
+        }
+
+        .logout-btn {
+            background: #ff4d4d;
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+        }
+
+        .logout-btn:hover {
+            background: #e63946;
+        }
+
+        /* MAIN */
+        .main {
+            padding: 30px 60px;
+        }
+
+        .title {
+            font-size: 32px;
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            margin: 20px 0 10px;
+            font-size: 20px;
+            opacity: 0.8;
+        }
+
+        /* BLOCK GRID */
+        .grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .card {
+            flex: 1;
+            min-width: 280px;
+            background: rgba(255,255,255,0.05);
+            padding: 20px;
+            border-radius: 18px;
+            backdrop-filter: blur(15px);
+            box-shadow: 0 0 25px rgba(0,0,0,0.8);
+            transition: 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card p {
+            margin: 6px 0;
+            font-size: 14px;
+        }
+
+        .hash {
+            font-size: 11px;
+            color: #94a3b8;
+            word-break: break-all;
+        }
+
+        /* VERIFY BOX */
+        .verify-box {
+            margin-top: 30px;
+            max-width: 400px;
+            background: rgba(255,255,255,0.05);
+            padding: 25px;
+            border-radius: 18px;
+            backdrop-filter: blur(15px);
+            box-shadow: 0 0 25px rgba(0,0,0,0.8);
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: none;
+            background: #e2e8f0;
+            color: black;
+        }
+
+        .verify-btn {
+            width: 100%;
+            padding: 12px;
+            background: white;
+            border: none;
+            border-radius: 10px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .verify-btn:hover {
+            background: #ddd;
+        }
+
+        #result {
+            margin-top: 10px;
+            font-weight: bold;
+            text-align: center;
+        }
+    </style>
 </head>
+
 <body>
 
-<div class="nav">
-<h3>Teacher Dashboard</h3>
-<a href="/logout" style="color:white;">Logout</a>
+<!-- HEADER -->
+<div class="header">
+    <div class="logo">BLOCKSUBMIT</div>
+
+    <a href="/logout">
+        <button class="logout-btn">Logout</button>
+    </a>
 </div>
 
-<div class="container">
+<!-- MAIN -->
+<div class="main">
 
-<h2>Blockchain Records</h2>
+    <div class="title">👨‍🏫 Teacher Dashboard</div>
 
-{% for block in chain %}
-<div class="card">
-<p><b>Block:</b> {{ block.index }}</p>
-<p>Student: {{ block.student_id }}</p>
-<p>Course: {{ block.course_id }}</p>
-<p>Time: {{ block.timestamp }}</p>
-<p class="hash">Hash: {{ block.file_hash }}</p>
+    <div class="section-title">📦 Blockchain Records</div>
+
+    <div class="grid">
+        {% for block in chain %}
+            <div class="card">
+                <p><b>Block:</b> {{ block.index }}</p>
+                <p><b>Student:</b> {{ block.student_id }}</p>
+                <p><b>Course:</b> {{ block.course_id }}</p>
+                <p><b>Version:</b> {{ block.version }}</p>
+                <p><b>Timestamp:</b> {{ block.timestamp }}</p>
+                <p class="hash"><b>Hash:</b> {{ block.file_hash }}</p>
+            </div>
+        {% endfor %}
+    </div>
+
+    <!-- VERIFY -->
+    <div class="verify-box">
+        <h3>🔍 Verify Submission</h3>
+
+        <form id="verifyForm">
+            <input type="file" name="file" required>
+            <button class="verify-btn" type="submit">Verify File</button>
+        </form>
+
+        <p id="result"></p>
+    </div>
+
 </div>
-{% endfor %}
 
-<h3>Verify Assignment</h3>
+<script>
+document.getElementById("verifyForm").onsubmit = async function(e) {
+    e.preventDefault();
 
-<form method="POST" enctype="multipart/form-data">
-<input type="file" name="file" required>
-<button>Verify</button>
-</form>
+    let formData = new FormData(this);
 
-<p class="msg">{{ msg }}</p>
+    let res = await fetch("/verify", {
+        method: "POST",
+        body: formData
+    });
 
-</div>
+    let data = await res.json();
+
+    let result = document.getElementById("result");
+
+    if (data.status === "original") {
+        result.innerHTML = "✅ FILE IS ORIGINAL";
+        result.style.color = "#4ade80";
+    } else {
+        result.innerHTML = "❌ FILE IS TAMPERED";
+        result.style.color = "#f87171";
+    }
+};
+</script>
 
 </body>
 </html>

@@ -1,36 +1,34 @@
 from flask import Flask, render_template, request, redirect, session
-import requests, hashlib
+import hashlib
+import requests
+import json
 
 app = Flask(__name__)
-app.secret_key = "secret123"
-
-NODE1 = "http://127.0.0.1:5000"
-NODE2 = "http://127.0.0.1:5001"
-
+app.secret_key = "secret"
 
 # ---------------- LOGIN ----------------
 @app.route("/", methods=["GET", "POST"])
+@app.route("/login", methods=["GET", "POST"])
 def login():
     msg = ""
 
     if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
+        username = request.form["username"]
+        password = request.form["password"]
 
-        session.clear()
+        with open("users.json") as f:
+            users = json.load(f)
 
-        if username == "student1" and password == "123":
+        if username in users and users[username]["password"] == password:
             session["user"] = username
-            session["role"] = "student"
-            return redirect("/student")
+            session["role"] = users[username]["role"]
 
-        elif username == "teacher1" and password == "123":
-            session["user"] = username
-            session["role"] = "teacher"
-            return redirect("/teacher")
-
+            if users[username]["role"] == "student":
+                return redirect("/student")
+            else:
+                return redirect("/teacher")
         else:
-            msg = "❌ Invalid credentials"
+            msg = "Invalid Credentials"
 
     return render_template("login.html", msg=msg)
 
@@ -39,114 +37,89 @@ def login():
 @app.route("/logout")
 def logout():
     session.clear()
-    return redirect("/")
+    return redirect("/login")
 
 
 # ---------------- STUDENT ----------------
 @app.route("/student", methods=["GET", "POST"])
 def student():
-    if "user" not in session or session.get("role") != "student":
-        return redirect("/")
+    if "user" not in session:
+        return redirect("/login")
 
     msg = ""
-    verify_msg = ""
 
     if request.method == "POST":
-        student_id = request.form.get("student_id")
-        course_id = request.form.get("course_id")
-        file = request.files.get("file")
+        file = request.files["file"]
+        student_id = request.form["student_id"]
+        course_id = request.form["course_id"]
 
-        if not student_id or not course_id or not file:
-            msg = "⚠️ All fields required"
-        else:
-            file_hash = hashlib.sha256(file.read()).hexdigest()
+        # 🔐 HASH FILE
+        file_bytes = file.read()
+        file_hash = hashlib.sha256(file_bytes).hexdigest()
 
-            data = {
-                "student_id": student_id,
-                "course_id": course_id,
-                "file_hash": file_hash
-            }
+        # 🔗 GET EXISTING CHAIN (for version)
+        try:
+            res = requests.get("http://127.0.0.1:5000/chain")
+            chain = res.json().get("chain", [])
+        except:
+            chain = []
 
-            try:
-                # send to NODE1 (main node)
-                r1 = requests.post(f"{NODE1}/add_block", json=data)
+        # 🔢 VERSION LOGIC
+        version = 1
+        for block in chain:
+            if block.get("student_id") == student_id and block.get("course_id") == course_id:
+                version += 1
 
-                # try sending to NODE2 (optional)
-                try:
-                    requests.post(f"{NODE2}/add_block", json=data)
-                except:
-                    print("Node2 not running")
-
-                if r1.status_code == 200:
-                    msg = "✅ Upload successful"
-                else:
-                    msg = f"❌ Upload failed: {r1.text}"
-
-            except Exception as e:
-                msg = f"Error: {str(e)}"
-
-    return render_template("student.html", msg=msg, verify_msg=verify_msg)
-
-
-# ---------------- STUDENT VERIFY ----------------
-@app.route("/verify_student", methods=["POST"])
-def verify_student():
-    if "user" not in session:
-        return redirect("/")
-
-    verify_msg = ""
-
-    file = request.files.get("file")
-
-    if file:
-        file_hash = hashlib.sha256(file.read()).hexdigest()
+        # 🚀 SEND TO NODE
+        data = {
+            "student_id": student_id,
+            "course_id": course_id,
+            "file_hash": file_hash,
+            "version": version
+        }
 
         try:
-            res = requests.get(f"{NODE1}/chain")
-            chain = res.json()
+            requests.post("http://127.0.0.1:5000/add_block", json=data)
+            msg = "✅ Uploaded Successfully"
+        except Exception as e:
+            msg = f"❌ Upload Failed: {e}"
 
-            found = any(block.get("file_hash") == file_hash for block in chain)
-
-            if found:
-                verify_msg = "✅ File is ORIGINAL"
-            else:
-                verify_msg = "❌ File NOT FOUND"
-
-        except:
-            verify_msg = "⚠️ Verification error"
-
-    return render_template("student.html", msg="", verify_msg=verify_msg)
+    return render_template("student.html", msg=msg)
 
 
 # ---------------- TEACHER ----------------
-@app.route("/teacher", methods=["GET", "POST"])
+@app.route("/teacher")
 def teacher():
-    if "user" not in session or session.get("role") != "teacher":
-        return redirect("/")
-
-    chain = []
-    msg = ""
+    if "user" not in session:
+        return redirect("/login")
 
     try:
-        res = requests.get(f"{NODE1}/chain")
-        chain = res.json()
+        res = requests.get("http://127.0.0.1:5000/chain")
+        chain = res.json().get("chain", [])
     except:
         chain = []
 
-    if request.method == "POST":
-        file = request.files.get("file")
+    return render_template("teacher.html", chain=chain)
 
-        if file:
-            file_hash = hashlib.sha256(file.read()).hexdigest()
 
-            found = any(block.get("file_hash") == file_hash for block in chain)
+# ---------------- VERIFY ----------------
+@app.route("/verify", methods=["POST"])
+def verify():
+    file = request.files["file"]
 
-            if found:
-                msg = "✅ File is ORIGINAL"
-            else:
-                msg = "❌ File NOT FOUND"
+    file_hash = hashlib.sha256(file.read()).hexdigest()
 
-    return render_template("teacher.html", chain=chain, msg=msg)
+    try:
+        res = requests.get("http://127.0.0.1:5000/chain")
+        chain = res.json().get("chain", [])
+    except:
+        chain = []
+
+    for block in chain:
+        if block.get("file_hash") == file_hash:
+            return {"status": "original"}
+
+    return {"status": "tampered"}
 
 
 # ---------------- RUN ----------------

@@ -8,16 +8,21 @@ app = Flask(__name__)
 
 FILE_NAME = "blockchain_5001.json"
 
-# Load blockchain
 if os.path.exists(FILE_NAME):
     with open(FILE_NAME) as f:
         blockchain = json.load(f)
 else:
     blockchain = []
 
+
 def save_blockchain():
     with open(FILE_NAME, "w") as f:
         json.dump(blockchain, f, indent=4)
+
+
+@app.route("/")
+def home():
+    return "Node2 running ✅"
 
 
 @app.route("/add_block", methods=["POST"])
@@ -27,22 +32,20 @@ def add_block():
     student_id = data["student_id"]
     course_id = data["course_id"]
 
-    # 🔥 VERSION LOGIC
+    # 🔥 VERSION LOGIC (fixed)
     version = 1
     for block in blockchain:
-        if (block["data"]["student_id"] == student_id and 
-            block["data"]["course_id"] == course_id):
-            version += 1
+        if (block["student_id"] == student_id and 
+            block["course_id"] == course_id):
+            version = max(version, block.get("version", 1) + 1)
 
     new_block = {
         "index": len(blockchain) + 1,
         "timestamp": str(datetime.datetime.now()),
-        "data": {
-            "student_id": student_id,
-            "course_id": course_id,
-            "hash": data["hash"],
-            "version": version
-        },
+        "student_id": student_id,
+        "course_id": course_id,
+        "file_hash": data["file_hash"],
+        "version": version,
         "previous_hash": blockchain[-1]["hash"] if blockchain else "0"
     }
 
@@ -56,9 +59,9 @@ def add_block():
     return jsonify(new_block)
 
 
-@app.route("/get_chain", methods=["GET"])
+@app.route("/chain", methods=["GET"])
 def get_chain():
-    return jsonify({"chain": blockchain})
+    return jsonify({"chain": blockchain, "length": len(blockchain)})
 
 
 if __name__ == "__main__":

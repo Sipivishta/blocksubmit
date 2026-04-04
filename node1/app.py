@@ -21,12 +21,16 @@ def save_chain(chain):
         json.dump(chain, f, indent=4)
 
 
+@app.route("/")
+def home():
+    return "Node1 running ✅"
+
+
 @app.route("/add_block", methods=["POST"])
 def add_block():
     data = request.json
 
     chain = load_chain()
-
     previous_hash = chain[-1]["hash"] if chain else "0"
 
     block = {

@@ -10,7 +10,7 @@ app.secret_key = "secret123"
 
 NODE_URL = "http://127.0.0.1:5000"
 
-# ---------------- LOAD USERS ---------------- #
+
 def load_users():
     if not os.path.exists("users.json"):
         return {}
@@ -27,38 +27,57 @@ def login():
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
-        selected_role = request.form.get("role")  # 🔥 from UI toggle
+        selected_role = request.form.get("role")
 
         users = load_users()
 
-        # ❌ USER NOT FOUND
         if username not in users:
-            msg = "User not found ❌"
-            return render_template("login.html", msg=msg)
+            return render_template("login.html", msg="User not found ❌")
 
         user = users[username]
 
-        # ❌ WRONG PASSWORD
         if user["password"] != password:
-            msg = "Wrong password ❌"
-            return render_template("login.html", msg=msg)
+            return render_template("login.html", msg="Wrong password ❌")
 
-        actual_role = user.get("role", "")
+        if selected_role != user.get("role"):
+            return render_template("login.html", msg="Wrong role ❌")
 
-        # 🚨 ROLE VALIDATION (MAIN FIX)
-        if selected_role != actual_role:
-            msg = f"You are registered as {actual_role.upper()} ❌"
-            return render_template("login.html", msg=msg)
-
-        # ✅ SESSION STORE
         session["user"] = username
-        session["role"] = actual_role
+        session["role"] = user["role"]
         session["courses"] = user.get("courses", [])
 
-        # ✅ REDIRECT CORRECTLY
-        return redirect("/student" if actual_role == "student" else "/teacher")
+        return redirect("/student" if user["role"] == "student" else "/teacher")
 
     return render_template("login.html", msg=msg)
+
+
+# ---------------- SIGNUP (FIXED POSITION) ---------------- #
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    msg = ""
+
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+        role = request.form.get("role")
+
+        users = load_users()
+
+        if username in users:
+            return render_template("signup.html", msg="User already exists ❌")
+
+        users[username] = {
+            "password": password,
+            "role": role,
+            "courses": []
+        }
+
+        with open("users.json", "w") as f:
+            json.dump(users, f, indent=4)
+
+        return redirect("/login")
+
+    return render_template("signup.html", msg=msg)
 
 
 # ---------------- LOGOUT ---------------- #
@@ -82,21 +101,17 @@ def student():
         course_id = request.form.get("course_id")
 
         if not file or file.filename == "":
-            msg = "No file selected ❌"
-            return render_template("student.html", msg=msg)
+            return render_template("student.html", msg="No file ❌")
 
-        file_data = file.read()
-        file_hash = hashlib.sha256(file_data).hexdigest()
+        file_hash = hashlib.sha256(file.read()).hexdigest()
         student_id = session["user"]
 
-        # 🔥 GET BLOCKCHAIN
         try:
             res = requests.get(f"{NODE_URL}/chain")
-            chain = res.json()
+            chain = res.json()["chain"]
         except:
             chain = []
 
-        # 🔥 VERSION LOGIC
         version = 1
         for block in chain:
             if block["student_id"] == student_id and block["course_id"] == course_id:
@@ -106,7 +121,6 @@ def student():
             "student_id": student_id,
             "course_id": course_id,
             "file_hash": file_hash,
-            "timestamp": str(datetime.datetime.now()),
             "version": version
         }
 
@@ -126,17 +140,16 @@ def teacher():
     if "user" not in session or session.get("role") != "teacher":
         return redirect("/")
 
-    selected_course = ""
-
     try:
         res = requests.get(f"{NODE_URL}/chain")
-        chain = res.json()
+        chain = res.json()["chain"]
     except:
         chain = []
 
+    selected_course = ""
+
     if request.method == "POST":
         selected_course = request.form.get("course_id")
-
         if selected_course:
             chain = [b for b in chain if b["course_id"] == selected_course]
 
@@ -157,50 +170,32 @@ def verify():
     course_id = request.form.get("course_id")
 
     if not file:
-        return jsonify({"status": "error", "message": "No file uploaded ❌"})
+        return jsonify({"status": "error", "message": "No file ❌"})
 
     file_hash = hashlib.sha256(file.read()).hexdigest()
 
     try:
         res = requests.get(f"{NODE_URL}/chain")
-        chain = res.json()
+        chain = res.json()["chain"]
     except:
         chain = []
 
-    # 🔥 FILTER MATCHING RECORDS
     relevant = [
         b for b in chain
         if b["student_id"] == student_id and b["course_id"] == course_id
     ]
 
     if not relevant:
-        return jsonify({
-            "status": "not_found",
-            "message": "No submission found ❌"
-        })
+        return jsonify({"status": "not_found", "message": "No record ❌"})
 
     latest = max(relevant, key=lambda x: x.get("version", 1))
 
-    # ✅ ORIGINAL
     if file_hash == latest["file_hash"]:
-        return jsonify({
-            "status": "original",
-            "message": f"Original File ✅ (Version {latest['version']})"
-        })
-
-    # ⚠ OLD VERSION
+        return jsonify({"status": "original", "message": "Original ✅"})
     elif any(file_hash == b["file_hash"] for b in relevant):
-        return jsonify({
-            "status": "old",
-            "message": "Old Version File ⚠️"
-        })
-
-    # ❌ MODIFIED / WRONG FILE
+        return jsonify({"status": "old", "message": "Old version ⚠️"})
     else:
-        return jsonify({
-            "status": "updated",
-            "message": "File Modified ❌"
-        })
+        return jsonify({"status": "modified", "message": "Modified ❌"})
 
 
 # ---------------- RUN ---------------- #

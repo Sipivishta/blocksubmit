@@ -127,8 +127,17 @@ def student():
         }
 
         try:
+            # 🔥 ADD BLOCK
             requests.post(f"{NODE_URL}/add_block", json=payload)
+
+            # 🔥 SYNC BLOCKCHAIN (NEW)
+            try:
+                requests.get(f"{NODE_URL}/sync")
+            except:
+                pass
+
             msg = f"Uploaded ✅ Version {version}"
+
         except:
             msg = "Upload failed ❌"
 
@@ -148,7 +157,7 @@ def teacher():
     except:
         chain = []
 
-    # 🔥 KEEP ONLY LATEST VERSION PER STUDENT+COURSE
+    # 🔥 KEEP ONLY LATEST VERSION
     latest_records = {}
 
     for block in chain:
@@ -162,7 +171,7 @@ def teacher():
 
     chain = list(latest_records.values())
 
-    # 🔥 SORT (LATEST FIRST)
+    # 🔥 SORT BY TIME
     chain = sorted(chain, key=lambda x: x["timestamp"], reverse=True)
 
     selected_course = ""

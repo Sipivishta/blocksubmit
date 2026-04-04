@@ -11,6 +11,7 @@ app.secret_key = "secret123"
 NODE_URL = "http://127.0.0.1:5000"
 
 
+# ---------------- LOAD USERS ---------------- #
 def load_users():
     if not os.path.exists("users.json"):
         return {}
@@ -51,7 +52,7 @@ def login():
     return render_template("login.html", msg=msg)
 
 
-# ---------------- SIGNUP (FIXED POSITION) ---------------- #
+# ---------------- SIGNUP ---------------- #
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     msg = ""
@@ -112,6 +113,7 @@ def student():
         except:
             chain = []
 
+        # 🔥 VERSION LOGIC
         version = 1
         for block in chain:
             if block["student_id"] == student_id and block["course_id"] == course_id:
@@ -145,6 +147,23 @@ def teacher():
         chain = res.json()["chain"]
     except:
         chain = []
+
+    # 🔥 KEEP ONLY LATEST VERSION PER STUDENT+COURSE
+    latest_records = {}
+
+    for block in chain:
+        key = (block["student_id"], block["course_id"])
+
+        if key not in latest_records:
+            latest_records[key] = block
+        else:
+            if block.get("version", 1) > latest_records[key].get("version", 1):
+                latest_records[key] = block
+
+    chain = list(latest_records.values())
+
+    # 🔥 SORT (LATEST FIRST)
+    chain = sorted(chain, key=lambda x: x["timestamp"], reverse=True)
 
     selected_course = ""
 
@@ -191,11 +210,20 @@ def verify():
     latest = max(relevant, key=lambda x: x.get("version", 1))
 
     if file_hash == latest["file_hash"]:
-        return jsonify({"status": "original", "message": "Original ✅"})
+        return jsonify({
+            "status": "original",
+            "message": f"Original File ✅ (Version {latest['version']})"
+        })
     elif any(file_hash == b["file_hash"] for b in relevant):
-        return jsonify({"status": "old", "message": "Old version ⚠️"})
+        return jsonify({
+            "status": "old",
+            "message": "Old Version ⚠️"
+        })
     else:
-        return jsonify({"status": "modified", "message": "Modified ❌"})
+        return jsonify({
+            "status": "modified",
+            "message": "Modified ❌"
+        })
 
 
 # ---------------- RUN ---------------- #

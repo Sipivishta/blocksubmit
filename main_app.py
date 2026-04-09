@@ -1,6 +1,5 @@
 from flask import Flask, render_template, request, redirect, session, jsonify
 import hashlib
-import datetime
 import requests
 import json
 import os
@@ -23,8 +22,6 @@ def load_users():
 @app.route("/", methods=["GET", "POST"])
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    msg = ""
-
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
@@ -49,28 +46,39 @@ def login():
 
         return redirect("/student" if user["role"] == "student" else "/teacher")
 
-    return render_template("login.html", msg=msg)
+    return render_template("login.html", msg="")
 
 
 # ---------------- SIGNUP ---------------- #
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
-    msg = ""
-
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
         role = request.form.get("role")
+        courses_input = request.form.get("courses")
 
         users = load_users()
 
         if username in users:
             return render_template("signup.html", msg="User already exists ❌")
 
+        courses = [c.strip() for c in courses_input.split(",") if c.strip()]
+
+        # 🔥 RULES
+        if role == "student" and len(courses) > 6:
+            return render_template("signup.html", msg="Max 6 courses allowed ❌")
+
+        if role == "teacher" and len(courses) > 2:
+            return render_template("signup.html", msg="Max 2 courses allowed ❌")
+
+        if len(courses) == 0:
+            return render_template("signup.html", msg="Enter at least one course ❌")
+
         users[username] = {
             "password": password,
             "role": role,
-            "courses": []
+            "courses": courses
         }
 
         with open("users.json", "w") as f:
@@ -78,7 +86,7 @@ def signup():
 
         return redirect("/login")
 
-    return render_template("signup.html", msg=msg)
+    return render_template("signup.html", msg="")
 
 
 # ---------------- LOGOUT ---------------- #
@@ -101,23 +109,21 @@ def student():
         file = request.files.get("file")
         course_id = request.form.get("course_id")
 
-        if not file or file.filename == "":
+        if not file:
             return render_template("student.html", msg="No file ❌")
 
         file_hash = hashlib.sha256(file.read()).hexdigest()
         student_id = session["user"]
 
         try:
-            res = requests.get(f"{NODE_URL}/chain")
-            chain = res.json()["chain"]
+            chain = requests.get(f"{NODE_URL}/chain").json()["chain"]
         except:
             chain = []
 
-        # 🔥 VERSION LOGIC
         version = 1
-        for block in chain:
-            if block["student_id"] == student_id and block["course_id"] == course_id:
-                version = max(version, block.get("version", 1) + 1)
+        for b in chain:
+            if b["student_id"] == student_id and b["course_id"] == course_id:
+                version = max(version, b.get("version", 1) + 1)
 
         payload = {
             "student_id": student_id,
@@ -126,20 +132,9 @@ def student():
             "version": version
         }
 
-        try:
-            # 🔥 ADD BLOCK
-            requests.post(f"{NODE_URL}/add_block", json=payload)
+        requests.post(f"{NODE_URL}/add_block", json=payload)
 
-            # 🔥 SYNC BLOCKCHAIN (NEW)
-            try:
-                requests.get(f"{NODE_URL}/sync")
-            except:
-                pass
-
-            msg = f"Uploaded ✅ Version {version}"
-
-        except:
-            msg = "Upload failed ❌"
+        msg = "File Uploaded ✅"
 
     return render_template("student.html", msg=msg)
 
@@ -152,40 +147,44 @@ def teacher():
         return redirect("/")
 
     try:
-        res = requests.get(f"{NODE_URL}/chain")
-        chain = res.json()["chain"]
+        chain = requests.get(f"{NODE_URL}/chain").json()["chain"]
     except:
         chain = []
 
-    # 🔥 KEEP ONLY LATEST VERSION
-    latest_records = {}
+    selected_course = request.form.get("course_id") if request.method == "POST" else ""
 
-    for block in chain:
-        key = (block["student_id"], block["course_id"])
+    if selected_course:
+        chain = [b for b in chain if b["course_id"] == selected_course]
 
-        if key not in latest_records:
-            latest_records[key] = block
-        else:
-            if block.get("version", 1) > latest_records[key].get("version", 1):
-                latest_records[key] = block
+    # 🔥 SORT for plagiarism logic
+    chain = sorted(chain, key=lambda x: x["timestamp"])
 
-    chain = list(latest_records.values())
+    hash_map = {}
+    for b in chain:
+        key = (b["course_id"], b["file_hash"])
+        hash_map.setdefault(key, []).append(b)
 
-    # 🔥 SORT BY TIME
+    duplicates = {}
+    copied_from = {}
+
+    for key, blocks in hash_map.items():
+        if len(blocks) > 1:
+            original = blocks[0]["student_id"]
+            for b in blocks:
+                k = (b["student_id"], b["course_id"], b["file_hash"])
+                duplicates[k] = True
+                if b["student_id"] != original:
+                    copied_from[k] = original
+
     chain = sorted(chain, key=lambda x: x["timestamp"], reverse=True)
-
-    selected_course = ""
-
-    if request.method == "POST":
-        selected_course = request.form.get("course_id")
-        if selected_course:
-            chain = [b for b in chain if b["course_id"] == selected_course]
 
     return render_template(
         "teacher.html",
         chain=chain,
         courses=session.get("courses", []),
-        selected_course=selected_course
+        selected_course=selected_course,
+        duplicates=duplicates,
+        copied_from=copied_from
     )
 
 
@@ -203,36 +202,22 @@ def verify():
     file_hash = hashlib.sha256(file.read()).hexdigest()
 
     try:
-        res = requests.get(f"{NODE_URL}/chain")
-        chain = res.json()["chain"]
+        chain = requests.get(f"{NODE_URL}/chain").json()["chain"]
     except:
         chain = []
 
-    relevant = [
-        b for b in chain
-        if b["student_id"] == student_id and b["course_id"] == course_id
-    ]
+    same = [b for b in chain if b["file_hash"] == file_hash and b["course_id"] == course_id]
 
-    if not relevant:
-        return jsonify({"status": "not_found", "message": "No record ❌"})
+    if not same:
+        return jsonify({"status": "not_found", "message": "File not found ❌"})
 
-    latest = max(relevant, key=lambda x: x.get("version", 1))
+    same = sorted(same, key=lambda x: x["timestamp"])
+    original = same[0]["student_id"]
 
-    if file_hash == latest["file_hash"]:
-        return jsonify({
-            "status": "original",
-            "message": f"Original File ✅ (Version {latest['version']})"
-        })
-    elif any(file_hash == b["file_hash"] for b in relevant):
-        return jsonify({
-            "status": "old",
-            "message": "Old Version ⚠️"
-        })
+    if student_id == original:
+        return jsonify({"status": "original", "message": "Original File ✅"})
     else:
-        return jsonify({
-            "status": "modified",
-            "message": "Modified ❌"
-        })
+        return jsonify({"status": "copied", "message": f"Copied from: {original} ⚠️"})
 
 
 # ---------------- RUN ---------------- #

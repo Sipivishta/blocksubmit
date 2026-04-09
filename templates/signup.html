@@ -23,6 +23,19 @@ body {
     animation: gradientMove 12s ease infinite;
 }
 
+/* GRID BACKGROUND */
+body::before {
+    content: "";
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background-image:
+        linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+    background-size: 50px 50px;
+    z-index: 0;
+}
+
 @keyframes gradientMove {
     0% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
@@ -40,16 +53,19 @@ body {
 
 .bg-elements span {
     position: absolute;
-    color: rgba(255,255,255,0.5);
-    font-size: 26px;
-    font-weight: 700;
+    color: rgba(0,255,255,0.25);
+    font-weight: bold;
 
     text-shadow:
-        0 0 8px rgba(255,255,255,0.3),
-        0 0 12px rgba(0,255,255,0.2);
+        0 0 8px rgba(0,255,255,0.4),
+        0 0 20px rgba(0,255,255,0.2);
 
-    animation: float 18s ease-in-out infinite;
+    animation: float 10s ease-in-out infinite alternate;
 }
+
+/* size variation */
+.bg-elements span:nth-child(odd){ font-size: 22px; }
+.bg-elements span:nth-child(even){ font-size: 30px; }
 
 /* positions */
 .bg-elements span:nth-child(1){ top:10%; left:20%;}
@@ -60,11 +76,18 @@ body {
 .bg-elements span:nth-child(6){ top:50%; left:80%;}
 .bg-elements span:nth-child(7){ top:75%; left:25%;}
 .bg-elements span:nth-child(8){ top:40%; left:60%;}
+.bg-elements span:nth-child(9){ top:15%; left:75%;}
+.bg-elements span:nth-child(10){ top:65%; left:55%;}
+.bg-elements span:nth-child(11){ top:85%; left:15%;}
+.bg-elements span:nth-child(12){ top:25%; left:85%;}
+.bg-elements span:nth-child(13){ top:55%; left:35%;}
+.bg-elements span:nth-child(14){ top:5%; left:50%;}
+.bg-elements span:nth-child(15){ top:45%; left:5%;}
+.bg-elements span:nth-child(16){ top:70%; left:90%;}
 
 @keyframes float {
-    0% { transform: translateY(0); }
-    50% { transform: translateY(-25px); }
-    100% { transform: translateY(0); }
+    0% { transform: translateY(0px); }
+    100% { transform: translateY(-30px); }
 }
 
 /* HEADER */
@@ -75,12 +98,9 @@ body {
 }
 
 .logo {
-    font-size: 24px;
+    font-size: 26px;
     font-weight: 900;
     letter-spacing: 3px;
-    text-shadow:
-        0 0 5px rgba(255,255,255,0.6),
-        0 0 10px rgba(0,255,255,0.3);
 }
 
 /* FORM */
@@ -94,6 +114,7 @@ body {
 }
 
 .card {
+    position: relative;
     background: rgba(255,255,255,0.05);
     padding: 45px;
     border-radius: 25px;
@@ -103,8 +124,15 @@ body {
     text-align: center;
 }
 
-h2 {
-    margin-bottom: 20px;
+/* glow border */
+.card::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    background: linear-gradient(45deg, #00ffff, #4ade80);
+    filter: blur(20px);
+    opacity: 0.3;
+    z-index: -1;
 }
 
 input, select {
@@ -117,16 +145,9 @@ input, select {
     color: black;
 }
 
-.input-box {
-    position: relative;
-}
-
-.toggle-password {
-    position: absolute;
-    right: 10px;
-    top: 14px;
-    cursor: pointer;
-    color: #555;
+input:focus {
+    outline: none;
+    box-shadow: 0 0 10px cyan;
 }
 
 button {
@@ -140,23 +161,8 @@ button {
     cursor: pointer;
 }
 
-button:hover {
-    background: #ddd;
-    transform: scale(1.02);
-}
-
 .msg {
-    margin-top: 10px;
-    color: #ff6b6b;
-}
-
-.back-link {
-    margin-top: 15px;
-    font-size: 13px;
-}
-
-.back-link a {
-    color: #38bdf8;
+    color: red;
 }
 </style>
 </head>
@@ -164,14 +170,22 @@ button:hover {
 <body>
 
 <div class="bg-elements">
-    <span>username</span>
-    <span>password</span>
-    <span>CS101</span>
-    <span>block</span>
     <span>hash</span>
+    <span>block</span>
+    <span>node</span>
     <span>verify</span>
-    <span>trusted</span>
+    <span>ledger</span>
+    <span>transaction</span>
+    <span>secure</span>
+    <span>timestamp</span>
     <span>course_id</span>
+    <span>student_id</span>
+    <span>upload</span>
+    <span>version</span>
+    <span>chain</span>
+    <span>integrity</span>
+    <span>auth</span>
+    <span>validation</span>
 </div>
 
 <div class="header">
@@ -187,51 +201,37 @@ button:hover {
 
 <input type="text" name="username" placeholder="Username" required>
 
-<div class="input-box">
-    <input type="password" id="password" name="password" placeholder="Password" required>
+<input type="password" name="password" placeholder="Password" required>
 
-    <!-- ✅ UPDATED EYE -->
-    <span class="toggle-password" onclick="togglePassword()" id="eye">
-        👁️‍🗨️
-    </span>
-</div>
-
-<select name="role" required>
+<select name="role" id="role" required>
     <option value="">Select Role</option>
     <option value="student">Student</option>
     <option value="teacher">Teacher</option>
 </select>
 
-<input type="text" name="courses" placeholder="CS101,CS102" required>
+<input type="text" name="courses" id="courses" placeholder="Enter courses" required>
 
 <button type="submit">Create Account</button>
 
 </form>
 
 {% if msg %}
-    <p class="msg">{{ msg }}</p>
+<p class="msg">{{ msg }}</p>
 {% endif %}
-
-<div class="back-link">
-    Already have an account? <a href="/login">Login</a>
-</div>
 
 </div>
 </div>
 
 <script>
-function togglePassword() {
-    const pwd = document.getElementById("password");
-    const eye = document.getElementById("eye");
+document.getElementById("role").addEventListener("change", function() {
+    let c = document.getElementById("courses");
 
-    if (pwd.type === "password") {
-        pwd.type = "text";
-        eye.innerHTML = "👁️";   // open
-    } else {
-        pwd.type = "password";
-        eye.innerHTML = "👁️‍🗨️"; // closed
+    if (this.value === "student") {
+        c.placeholder = "Max 6 courses (CS101,CS102...)";
+    } else if (this.value === "teacher") {
+        c.placeholder = "Max 2 courses (CS101,CS102)";
     }
-}
+});
 </script>
 
 </body>

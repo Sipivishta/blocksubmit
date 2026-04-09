@@ -24,7 +24,6 @@
             100% { background-position: 0% 50%; }
         }
 
-        /* HEADER */
         .header {
             display: flex;
             justify-content: space-between;
@@ -36,9 +35,6 @@
             font-size: 26px;
             font-weight: 900;
             letter-spacing: 3px;
-            text-shadow:
-                0 0 6px rgba(255,255,255,0.6),
-                0 0 12px rgba(0,255,255,0.3);
         }
 
         .logout-btn {
@@ -49,14 +45,8 @@
             color: white;
             cursor: pointer;
             font-weight: bold;
-            transition: 0.3s;
         }
 
-        .logout-btn:hover {
-            background: #ff1a1a;
-        }
-
-        /* MAIN */
         .container {
             padding: 40px 70px;
         }
@@ -66,7 +56,6 @@
             font-size: 30px;
         }
 
-        /* DROPDOWN */
         select {
             padding: 12px;
             border-radius: 10px;
@@ -76,20 +65,17 @@
             margin-bottom: 25px;
         }
 
-        /* GRID */
         .grid {
             display: flex;
             flex-wrap: wrap;
             gap: 20px;
         }
 
-        /* CARD */
         .card {
             background: rgba(255,255,255,0.05);
             padding: 20px;
             border-radius: 18px;
             width: 300px;
-
             backdrop-filter: blur(15px);
             box-shadow: 0 0 25px rgba(0,0,0,0.8);
             transition: 0.3s;
@@ -109,20 +95,19 @@
             word-break: break-all;
         }
 
-        /* VERIFY BOX */
+        .duplicate {
+            border: 2px solid red;
+            background: rgba(255, 0, 0, 0.15);
+        }
+
         .verify-box {
             margin-top: 50px;
             max-width: 420px;
             background: rgba(255,255,255,0.05);
             padding: 25px;
             border-radius: 18px;
-
             backdrop-filter: blur(15px);
             box-shadow: 0 0 30px rgba(0,0,0,0.8);
-        }
-
-        .verify-box h3 {
-            margin-bottom: 10px;
         }
 
         input, button {
@@ -142,12 +127,6 @@
             background: white;
             font-weight: bold;
             cursor: pointer;
-            transition: 0.3s;
-        }
-
-        button:hover {
-            background: #ddd;
-            transform: scale(1.02);
         }
 
         #result {
@@ -172,7 +151,6 @@
 
     <h2>👨‍🏫 Teacher Dashboard</h2>
 
-    <!-- COURSE FILTER -->
     <form method="POST">
         <select name="course_id" onchange="this.form.submit()">
             <option value="">All Courses</option>
@@ -184,10 +162,13 @@
         </select>
     </form>
 
-    <!-- BLOCKCHAIN -->
     <div class="grid">
         {% for block in chain %}
-        <div class="card">
+
+        {% set key = (block.student_id, block.course_id, block.file_hash) %}
+
+        <div class="card {% if key in duplicates %}duplicate{% endif %}">
+
             <p><b>Student:</b> {{ block.student_id }}</p>
             <p><b>Course:</b> {{ block.course_id }}</p>
             <p><b>Version:</b> {{ block.version }}</p>
@@ -196,11 +177,23 @@
             <p class="hash">
                 <b>Hash:</b><br>{{ block.file_hash }}
             </p>
+
+            {% if key in duplicates %}
+                <p style="color:red; font-weight:bold;">
+                    ⚠️ Duplicate Submission
+                </p>
+            {% endif %}
+
+            {% if key in copied_from %}
+                <p style="color:orange;">
+                    Copied from: {{ copied_from[key] }}
+                </p>
+            {% endif %}
+
         </div>
         {% endfor %}
     </div>
 
-    <!-- VERIFY -->
     <div class="verify-box">
         <h3>🔍 Verify Submission</h3>
 
@@ -240,8 +233,9 @@ document.getElementById("verifyForm").onsubmit = async function(e) {
 
     result.innerHTML = data.message;
 
+    // 🔥 FINAL FIX (IMPORTANT)
     if (data.status === "original") result.style.color = "#4ade80";
-    else if (data.status === "updated") result.style.color = "#facc15";
+    else if (data.status === "copied") result.style.color = "#f87171";
     else result.style.color = "#f87171";
 };
 </script>

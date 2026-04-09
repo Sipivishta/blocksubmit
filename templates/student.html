@@ -51,9 +51,13 @@
             font-weight: bold;
         }
 
-        /* MAIN */
+        /* 🔥 MAIN CENTER FIX */
         .container {
-            padding: 40px 70px;
+            min-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;     /* center horizontally */
+            justify-content: center; /* center vertically */
         }
 
         h2 {
@@ -61,18 +65,18 @@
             font-size: 30px;
         }
 
-        /* 🔥 SIDE-BY-SIDE LAYOUT */
+        /* 🔥 CENTERED DASHBOARD */
         .dashboard {
             display: flex;
             gap: 40px;
+            justify-content: center;
+            align-items: center;
             flex-wrap: wrap;
         }
 
         /* BOX */
         .box {
-            flex: 1;
-            min-width: 320px;
-            max-width: 450px;
+            width: 380px;
 
             background: rgba(255,255,255,0.05);
             padding: 30px;
@@ -132,6 +136,13 @@
             text-align: center;
             font-weight: bold;
             margin-top: 10px;
+        }
+
+        /* 🔥 MOBILE FIX */
+        @media (max-width: 768px) {
+            .dashboard {
+                flex-direction: column;
+            }
         }
     </style>
 </head>

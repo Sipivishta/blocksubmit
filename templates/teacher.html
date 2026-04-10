@@ -171,22 +171,41 @@
 
             <p><b>Student:</b> {{ block.student_id }}</p>
             <p><b>Course:</b> {{ block.course_id }}</p>
-            <p><b>Version:</b> {{ block.version }}</p>
+
+            <!-- ✅ SAFE VERSION -->
+            <p><b>Version:</b> {{ block.get('version', 1) }}</p>
+
             <p><b>Time:</b> {{ block.timestamp }}</p>
 
             <p class="hash">
                 <b>Hash:</b><br>{{ block.file_hash }}
             </p>
 
+            <!-- 🔴 COPY -->
             {% if key in duplicates %}
                 <p style="color:red; font-weight:bold;">
                     ⚠️ Duplicate Submission
                 </p>
             {% endif %}
 
+            <!-- 🟡 MULTIPLE VERSIONS -->
+            {% if key in version_duplicates %}
+                <p style="color:yellow; font-weight:bold;">
+                    ⚠️ Multiple Versions Submitted
+                </p>
+            {% endif %}
+
+            <!-- 🟠 COPIED FROM -->
             {% if key in copied_from %}
                 <p style="color:orange;">
                     Copied from: {{ copied_from[key] }}
+                </p>
+            {% endif %}
+
+            <!-- 🔵 UPDATED -->
+            {% if block.get('version', 1) > 1 %}
+                <p style="color:#60a5fa;">
+                    Updated Submission
                 </p>
             {% endif %}
 
@@ -231,12 +250,14 @@ document.getElementById("verifyForm").onsubmit = async function(e) {
     let data = await res.json();
     let result = document.getElementById("result");
 
+    // ✅ SHOW VERSION + MESSAGE
     result.innerHTML = data.message;
 
-    // 🔥 FINAL FIX (IMPORTANT)
-    if (data.status === "original") result.style.color = "#4ade80";
-    else if (data.status === "copied") result.style.color = "#f87171";
-    else result.style.color = "#f87171";
+    if (data.status === "original") {
+        result.style.color = "#4ade80";
+    } else {
+        result.style.color = "#f87171";
+    }
 };
 </script>
 

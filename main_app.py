@@ -65,12 +65,11 @@ def signup():
 
         courses = [c.strip() for c in courses_input.split(",") if c.strip()]
 
-        # 🔥 RULES
         if role == "student" and len(courses) > 6:
-            return render_template("signup.html", msg="Max 6 courses allowed ❌")
+            return render_template("signup.html", msg="Max 6 courses ❌")
 
         if role == "teacher" and len(courses) > 2:
-            return render_template("signup.html", msg="Max 2 courses allowed ❌")
+            return render_template("signup.html", msg="Max 2 courses ❌")
 
         if len(courses) == 0:
             return render_template("signup.html", msg="Enter at least one course ❌")
@@ -134,7 +133,7 @@ def student():
 
         requests.post(f"{NODE_URL}/add_block", json=payload)
 
-        msg = "File Uploaded ✅"
+        msg = f"File Uploaded ✅ (Version {version})"
 
     return render_template("student.html", msg=msg)
 
@@ -156,9 +155,9 @@ def teacher():
     if selected_course:
         chain = [b for b in chain if b["course_id"] == selected_course]
 
-    # 🔥 SORT for plagiarism logic
     chain = sorted(chain, key=lambda x: x["timestamp"])
 
+    # COPY DUPLICATES
     hash_map = {}
     for b in chain:
         key = (b["course_id"], b["file_hash"])
@@ -176,6 +175,20 @@ def teacher():
                 if b["student_id"] != original:
                     copied_from[k] = original
 
+    # VERSION DUPLICATES
+    student_map = {}
+    for b in chain:
+        key = (b["student_id"], b["course_id"])
+        student_map.setdefault(key, []).append(b)
+
+    version_duplicates = {}
+
+    for key, blocks in student_map.items():
+        if len(blocks) > 1:
+            for b in blocks:
+                k = (b["student_id"], b["course_id"], b["file_hash"])
+                version_duplicates[k] = True
+
     chain = sorted(chain, key=lambda x: x["timestamp"], reverse=True)
 
     return render_template(
@@ -184,11 +197,12 @@ def teacher():
         courses=session.get("courses", []),
         selected_course=selected_course,
         duplicates=duplicates,
-        copied_from=copied_from
+        copied_from=copied_from,
+        version_duplicates=version_duplicates
     )
 
 
-# ---------------- VERIFY ---------------- #
+# ---------------- VERIFY (UPDATED) ---------------- #
 @app.route("/verify", methods=["POST"])
 def verify():
 
@@ -212,12 +226,31 @@ def verify():
         return jsonify({"status": "not_found", "message": "File not found ❌"})
 
     same = sorted(same, key=lambda x: x["timestamp"])
-    original = same[0]["student_id"]
+    original_block = same[0]
 
-    if student_id == original:
-        return jsonify({"status": "original", "message": "Original File ✅"})
+    original_student = original_block["student_id"]
+    original_version = original_block.get("version", 1)
+
+    student_blocks = [
+        b for b in chain
+        if b["student_id"] == student_id and b["course_id"] == course_id
+    ]
+
+    student_version = 1
+    for b in student_blocks:
+        if b["file_hash"] == file_hash:
+            student_version = b.get("version", 1)
+
+    if student_id == original_student:
+        return jsonify({
+            "status": "original",
+            "message": f"Original File ✅ (Version {student_version})"
+        })
     else:
-        return jsonify({"status": "copied", "message": f"Copied from: {original} ⚠️"})
+        return jsonify({
+            "status": "copied",
+            "message": f"Copied from: {original_student} ⚠️ (Original Version {original_version})"
+        })
 
 
 # ---------------- RUN ---------------- #

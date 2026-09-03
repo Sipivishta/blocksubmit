@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-ink-50 text-ink-900;
+    background-image: linear-gradient(180deg, rgb(238 244 255 / 0.48) 0, transparent 280px);
+  }
+
+  /* Consistent, visible focus ring across every interactive element —
+     removing the default outline only ever in favor of an equivalent,
+     never removing it outright. */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-ink-50;
+  }
+}
+
+@layer components {
+  /* Shared primitives used across the redesigned pages. Kept as CSS
+     classes (not React components) for the ones with no interactivity,
+     so plain server components can use them without becoming client
+     components. */
+  .card {
+    @apply rounded-xl border border-ink-200/80 bg-white shadow-card;
+    transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+  }
+
+  .card-padded {
+    @apply card p-5 sm:p-6;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-brand-700 hover:shadow-lift disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md border border-ink-200 bg-white px-4 py-2 text-sm font-semibold text-ink-700 transition-all hover:-translate-y-0.5 hover:border-brand-300 hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .input {
+    @apply w-full rounded-md border border-ink-200 bg-white px-3 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 shadow-sm transition-colors focus:border-brand-500;
+  }
+
+  .label {
+    @apply block text-xs font-semibold uppercase tracking-wide text-ink-500;
+  }
+
+  .eyebrow {
+    @apply text-[11px] font-bold uppercase tracking-[0.16em] text-brand-600;
+  }
+
+  .page-intro {
+    @apply rounded-2xl border border-brand-100 bg-gradient-to-br from-white via-white to-brand-50/70 p-5 shadow-card sm:p-6;
+  }
+
+  .surface-grid {
+    background-image: linear-gradient(rgb(59 111 224 / 0.06) 1px, transparent 1px), linear-gradient(90deg, rgb(59 111 224 / 0.06) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .auth-page {
+    @apply relative min-h-[calc(100vh-4rem)] overflow-hidden;
+    background-color: #f8fafc;
+    background-image: linear-gradient(rgb(59 111 224 / 0.055) 1px, transparent 1px), linear-gradient(90deg, rgb(59 111 224 / 0.055) 1px, transparent 1px), radial-gradient(circle at 50% 0, rgb(219 230 254 / 0.6), transparent 38%);
+    background-size: 28px 28px, 28px 28px, 100% 100%;
+  }
+
+  .auth-surface {
+    @apply rounded-2xl border border-ink-200/80 bg-white/95 p-5 shadow-lift backdrop-blur sm:p-6;
+  }
+}

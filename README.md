@@ -24,7 +24,6 @@ When a student submits a document, BlockSubmit validates the file, stores it pri
 
 During a later verification, the document's current fingerprint is recomputed and compared with the immutable on-chain fingerprint.
 
-```text
 Document
    ↓
 SHA-256 Fingerprint

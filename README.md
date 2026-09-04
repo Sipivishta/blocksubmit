@@ -24,6 +24,7 @@ When a student submits a document, BlockSubmit validates the file, stores it pri
 
 During a later verification, the document's current fingerprint is recomputed and compared with the immutable on-chain fingerprint.
 
+```text
 Document
    ↓
 SHA-256 Fingerprint
@@ -699,13 +700,6 @@ Audit timeline
 Duplicate submission protection
 Request-origin protection
 Responsive web interface
-
-
-License
-
-This project is currently presented as a personal/academic portfolio project.
-
-If the repository is later distributed as open-source software, an appropriate open-source license can be added.
 
 Author
 

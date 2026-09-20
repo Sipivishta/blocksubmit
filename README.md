@@ -94,7 +94,7 @@ Teacher-student access is relationship-based rather than globally granting every
       ┌─────────────┐       ┌──────────────┐      ┌──────────────┐
       │  Supabase   │       │ Cloudflare   │      │   Ethereum   │
       │ PostgreSQL  │       │     R2       │      │    Sepolia   │
-      │ Auth + RLS  │       │ Private Files│      │ Solidity      │
+      │ Auth + RLS  │       │ Private Files│      │ Solidity     │
       └─────────────┘       └──────────────┘      └──────────────┘
              │                      │                      │
              │                      │                      │
@@ -103,6 +103,7 @@ Teacher-student access is relationship-based rather than globally granting every
        submissions,           access URLs
        grades, audit
        relationships
+```
 
 Data responsibilities
 Supabase
@@ -508,6 +509,7 @@ DOCX validation/extraction
 PPTX validation
 Text similarity analysis
 Project Structure
+```text
 blocksubmit/
 │
 ├── app/
@@ -593,6 +595,7 @@ blocksubmit/
 ├── package.json
 ├── tailwind.config.ts
 └── tsconfig.json
+```
 Environment Variables
 
 Create a local .env.local file.
@@ -717,6 +720,7 @@ npm run build
 End-to-End Workflow
 
 A typical workflow is:
+```text
 
 Admin
   │
@@ -756,6 +760,7 @@ Confirmed Submission
             ├── Teacher Grading
             │
             └── Audit Timeline
+```
 Verification Flow
 
 For a confirmed submission:
@@ -767,22 +772,28 @@ Compare the recomputed hash with the recorded hash.
 Return the integrity result.
 
 Possible outcomes include:
+```text
 
 VERIFIED
+```
 
 or:
+```text
 
 TAMPERED
+```
 
 A TAMPERED result means the current document bytes no longer match the fingerprint recorded on-chain.
 
 Testing & Validation
 
 The current build has been validated with:
+```text
 
 npm run typecheck
 npm run lint
 npm run build
+```
 
 Manual functional testing has covered:
 
@@ -861,6 +872,7 @@ Production monitoring and observability
 Security Philosophy
 
 BlockSubmit follows a defense-in-depth approach.
+```text
 
 Authentication
       +
@@ -881,6 +893,7 @@ Blockchain Proof
 Audit Logging
       +
 Origin Validation
+```
 
 No single layer is intended to provide the entire security boundary.
 

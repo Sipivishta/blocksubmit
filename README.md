@@ -1,327 +1,910 @@
 # BlockSubmit
 
-A hybrid Web2/Web3 platform for secure academic document submissions.
-Files live in Cloudflare R2, structured data lives in Postgres, and a
-Solidity contract on Sepolia records an immutable SHA-256 fingerprint of
-each submission — so integrity can be verified independently of the app.
+### Secure Academic Document Submission & Integrity Verification Platform
 
-## Architecture
+BlockSubmit is a full-stack academic document submission platform designed to provide **secure file storage, cryptographic integrity verification, blockchain-backed proof, role-based access control, auditability, and submission similarity analysis**.
 
-```
-┌─────────────┐   presigned URLs    ┌──────────────┐
-│   Next.js   │◄────────────────────►│ Cloudflare R2│  (binary files only)
-│  App Router │                      └──────────────┘
-│  (Vercel)   │
-│             │      SHA-256 + IDs   ┌──────────────┐
-│  API routes │─────────────────────►│  Solidity     │
-│             │                      │  (Sepolia)    │  (fingerprint only,
-│             │◄─────────────────────│               │   never the file)
-│             │   read for verify    └──────────────┘
-│             │
-│             │      RLS-enforced    ┌──────────────┐
-│             │◄────────────────────►│  Supabase     │
-└─────────────┘   queries + auth     │  Postgres+Auth│
-                                      └──────────────┘
-```
+The platform separates the actual document from its verification proof:
 
-Three data stores, three jobs:
-- **Postgres** — structured relational data, relationships, audit logs, RLS.
-- **R2** — actual binary files, accessed only via short-lived presigned URLs.
-- **Blockchain** — only the fingerprint (fileHash + metadata). The file
-  itself never touches the chain.
+- Documents are stored privately in **Cloudflare R2**
+- Application data and access control are managed through **Supabase PostgreSQL + Auth + RLS**
+- A server-side **SHA-256 fingerprint** is generated for every accepted submission
+- The fingerprint and submission metadata are recorded on **Ethereum Sepolia**
+- Temporary signed URLs provide controlled document viewing/downloading
+- Similarity analysis identifies potentially matching submissions
+- Teachers can grade submissions
+- Administrators control teacher-student relationships
+- Audit timelines provide a traceable submission history
 
-## Submission state machine
+> **Important:** Blockchain records the document fingerprint and metadata, not the document itself.
 
-```
-UPLOADING → STORED → HASHED → RECORDING → CONFIRMED
-    │           │                  │
-    ▼           ▼                  ▼
-UPLOAD_FAILED HASH_FAILED   BLOCKCHAIN_FAILED (retryable via
-                                                PATCH /api/submissions/[id]/retry)
-```
+---
 
-Each step updates the `submissions.status` column so the UI always
-reflects exactly where a submission is, and a blockchain failure never
-loses the uploaded file or its hash — only the on-chain step needs retrying.
+## Features
 
-## Trust model (why a single server signer)
+### 🔐 Role-Based Access Control
 
-`SubmissionRegistry.recordSubmission` is gated to a single `owner` address
-held server-side. This keeps the demo simple and keys the "who can write"
-question to "who can pass RBAC in the app," which mirrors how the rest of
-the system already enforces authorization. A production version protecting
-against a compromised server would move signing client-side (student or
-teacher signs with their own wallet) or use a role-gated multi-signer setup.
+BlockSubmit supports three application roles:
 
-## Project structure
+- **Student**
+- **Teacher**
+- **Admin**
 
-```
-app/
-  api/
-    health/                 GET  — DB + R2 + blockchain connectivity check
-    assignments/             GET/POST — assignment CRUD
-    submissions/              GET/POST — list / create (full upload flow)
-      [id]/verify/            POST — recompute hash, compare to on-chain
-      [id]/download/          GET  — presigned download URL
-      [id]/retry/             PATCH — retry a failed blockchain recording
-    grades/                   POST — create/update a grade
-  verify/[submissionId]/      Public integrity-proof page (no auth)
-  dashboard/student/          Student dashboard
-  dashboard/teacher/          Teacher dashboard
-  login/ register/            Auth pages
-components/                   StatusBadge, SubmissionUploadForm, VerifyIntegrityCard
-lib/                          supabase-server, supabase-browser, auth (RBAC),
-                               r2, hash, blockchain, audit
-types/                        Shared TypeScript types (mirrors DB schema)
-supabase/migrations/          0001_init.sql — schema, RLS policies, triggers
-                               0002_fix_handle_new_user.sql — hardens the
-                               auth.users -> profiles trigger (idempotent,
-                               duplicate-safe, pinned search_path)
-contracts/                    SubmissionRegistry.sol
-scripts/                      deploy.ts (Hardhat)
-```
+Authorization is enforced server-side and reinforced through Supabase Row Level Security (RLS).
 
-## Setup
+### Student
 
-1. **Supabase**: create a project, run every file in
-   `supabase/migrations/` **in order** (`0001_init.sql` then
-   `0002_fix_handle_new_user.sql`) in the SQL editor, or `supabase
-   migration up` with the CLI. Copy the project URL, anon key, and
-   service role key into `.env`.
-2. **Cloudflare R2**: create a bucket, generate an API token with
-   read/write access, copy account ID + keys into `.env`.
-3. **Blockchain**: get a Sepolia RPC URL (Infura/Alchemy), fund a throwaway
-   wallet with Sepolia test ETH, put its private key in `BLOCKCHAIN_PRIVATE_KEY`.
-4. Copy `.env.example` to `.env` and fill in all values.
+Students can:
 
-### Deploying the contract
+- View assignments available to them
+- Upload submissions
+- View submission status
+- View submitted documents
+- Download submitted documents
+- Verify document integrity
+- View SHA-256 fingerprints
+- View blockchain proof
+- View grades
+- View submission audit history
+- View similarity information where permitted
 
-Hardhat is already configured in this repo (`hardhat.config.ts`) — no
-manual scaffolding needed. It reads the same environment variable names
-the app itself uses:
+### Teacher
 
-- `BLOCKCHAIN_RPC_URL`
-- `BLOCKCHAIN_PRIVATE_KEY` — the deployer/signer's private key, funded
-  with Sepolia test ETH (get some from a Sepolia faucet — this repo can't
-  do that for you)
-- `BLOCKCHAIN_CHAIN_ID` (defaults to `11155111`, Sepolia)
+Teachers can:
 
-```bash
-npm install                          # installs hardhat + toolbox, already in package.json
-npm run compile                      # npx hardhat compile — compiles SubmissionRegistry.sol
-npx hardhat run scripts/deploy.ts    # no --network flag: deploys to Hardhat's built-in
-                                      # in-memory network, useful to sanity-check the
-                                      # script itself with zero credentials
-npm run deploy:sepolia               # npx hardhat run scripts/deploy.ts --network sepolia
-                                      # — the real deployment; requires .env filled in
-```
+- Create and manage assignments
+- View submissions for their assignments
+- Grade submissions from `0–100`
+- View submission history
+- Verify document integrity
+- View blockchain proof
+- View similarity analysis
+- Review potential similarity matches
+- Manage their academic workflow through the teacher dashboard
 
-`deploy:sepolia` prints the network name/chain ID, the deployer's public
-address and balance, and — once mined — the deployed contract address and
-deployment transaction hash. It never prints `BLOCKCHAIN_PRIVATE_KEY` or
-any other secret. Copy the printed address into `BLOCKCHAIN_CONTRACT_ADDRESS`
-in `.env`.
+### Admin
 
-`hardhat.config.ts` is dev-tooling only: it's never imported by anything
-under `app/`, `lib/`, or `components/`, and `hardhat` itself is a
-`devDependency` — neither ships in the Next.js build or reaches the
-browser.
+Administrators can:
 
-### End-to-end test (once deployed)
+- Manage teachers
+- Manage students
+- Promote eligible users to teachers
+- Create teacher accounts
+- Explicitly link teachers and students
+- Remove teacher-student relationships
+- View administrative information
+- Access role-protected administrative functionality
 
-With a real Supabase project, R2 bucket, and a Sepolia-deployed contract
-address all configured in `.env`:
+Teacher-student access is relationship-based rather than globally granting every teacher access to every student.
 
-1. Register a student account, log in.
-2. Have a teacher account (promoted via SQL — see "Setup" above) create
-   an assignment.
-3. As the student, upload a real file on `/student` or the assignment's
-   details page.
-4. Confirm in Supabase's Table Editor that the `submissions` row reaches
-   `status = 'CONFIRMED'` with a non-null `blockchain_tx_hash` and
-   `blockchain_block_number`.
-5. Confirm the R2 bucket actually contains the object at
-   `submissions/{submissionId}/{filename}`.
-6. Open the submission's details page and click "Verify Integrity" (or
-   visit the public `/verify/[submissionId]` page) — expect **VERIFIED**,
-   with the displayed SHA-256 matching what you'd get from running
-   `shasum -a 256` on the original file locally.
-7. Click the transaction hash's explorer link and confirm the transaction
-   is visible on Sepolia Etherscan.
+---
 
-### Tamper test
+# Core Architecture
 
-To see a real **TAMPERED** result (not simulated): after step 6 above,
-go into the R2 bucket (dashboard, or `aws s3 cp` / `rclone` pointed at
-the R2 S3-compatible endpoint) and overwrite the object at that same key
-with a different file's bytes, keeping the same filename/key. Re-run
-verification — the recomputed hash will no longer match the on-chain
-hash, and the result will be **TAMPERED**. The on-chain record itself is
-never touched by this test (the contract has no update path at all —
-confirm this yourself by calling `getSubmission` on the contract and
-seeing the original hash unchanged).
+```text
+                         ┌──────────────────────┐
+                         │      BlockSubmit     │
+                         │       Next.js        │
+                         │     App Router       │
+                         └──────────┬───────────┘
+                                    │
+             ┌──────────────────────┼──────────────────────┐
+             │                      │                      │
+             ▼                      ▼                      ▼
+      ┌─────────────┐       ┌──────────────┐      ┌──────────────┐
+      │  Supabase   │       │ Cloudflare   │      │   Ethereum   │
+      │ PostgreSQL  │       │     R2       │      │    Sepolia   │
+      │ Auth + RLS  │       │ Private Files│      │ Solidity      │
+      └─────────────┘       └──────────────┘      └──────────────┘
+             │                      │                      │
+             │                      │                      │
+       Users, roles,          Academic files        SHA-256 proof
+       assignments,           temporary signed      + metadata
+       submissions,           access URLs
+       grades, audit
+       relationships
 
+Data responsibilities
+Supabase
 
-### Running locally
+Stores:
 
-```bash
+Users and profiles
+Roles
+Assignments
+Submissions
+Grades
+Teacher-student relationships
+Audit logs
+Similarity match records
+Submission metadata
+
+Supabase RLS provides an additional database-level authorization layer.
+
+Cloudflare R2
+
+Stores:
+
+Original submitted documents
+
+Files remain in a private bucket.
+
+Access is provided through short-lived signed URLs after server-side authorization checks.
+
+Ethereum Sepolia
+
+Stores:
+
+Submission identifier
+SHA-256 document fingerprint
+Relevant submission metadata
+
+The actual document is never uploaded to the blockchain.
+
+Submission Pipeline
+
+Every submission follows a controlled processing pipeline:
+
+01 Upload
+     ↓
+02 Store
+     ↓
+03 Hash
+     ↓
+04 Record
+     ↓
+05 Verify
+
+Internally, the submission state machine is:
+
+UPLOADING
+    ↓
+STORED
+    ↓
+HASHED
+    ↓
+RECORDING
+    ↓
+CONFIRMED
+
+Failure states are handled separately:
+
+UPLOAD_FAILED
+HASH_FAILED
+BLOCKCHAIN_FAILED
+
+A blockchain failure does not invalidate the uploaded document or its generated hash. The blockchain recording step can be retried.
+
+Document Upload Security
+
+BlockSubmit does not blindly trust the MIME type supplied by the browser.
+
+The server validates uploaded file content before accepting it.
+
+Supported document formats include:
+
+PDF
+DOCX
+PPTX
+
+Validation includes content-level checks such as:
+
+PDF
+PDF signature/header validation
+supported PDF structure
+EOF validation
+DOCX / PPTX
+ZIP/container validation
+required Office XML structures
+malformed archive detection
+encrypted/malformed archive rejection
+
+The detected content type is used rather than trusting the browser-provided MIME type.
+
+Files that fail validation do not proceed to accepted storage/submission processing.
+
+Private Document Access
+
+Submitted files are stored in a private Cloudflare R2 bucket.
+
+BlockSubmit does not expose permanent public file URLs.
+
+Instead, authorized requests receive short-lived signed URLs.
+
+The submission interface provides separate actions for:
+
+View
+Download
+
+For supported PDF files, viewing can open the document inline.
+
+DOCX/PPTX files may require download depending on browser support.
+
+Cryptographic Integrity Verification
+
+Every accepted document receives a server-generated SHA-256 fingerprint.
+
+Example:
+
+SHA-256
+
+f6a430597f64e2fc9a357f200954a766e2765ee71d5416ac8ef7f4203e06a717
+
+The hash is generated from the actual server-received file bytes.
+
+The browser does not provide the authoritative hash.
+
+This allows BlockSubmit to later recompute the document hash and compare it against the recorded fingerprint.
+
+Blockchain Verification
+
+BlockSubmit uses a Solidity smart contract deployed on Ethereum Sepolia.
+
+The blockchain record contains the document fingerprint and metadata rather than the document itself.
+
+Example verification information:
+
+Integrity Proof
+
+SHA-256
+f6a430...a717
+
+Network
+Ethereum Sepolia
+
+Status
+Confirmed
+
+Block
+11723252
+
+Transaction
+0xe585...1d73
+
+The blockchain acts as a tamper-evident external record of the submission fingerprint.
+
+Blockchain Retry & Recovery
+
+BlockSubmit handles failures between the application and blockchain.
+
+A submission may reach:
+
+RECORDING
+
+or:
+
+BLOCKCHAIN_FAILED
+
+without requiring the user to upload the document again.
+
+The recording process uses an idempotent strategy:
+
+The smart contract prevents duplicate records for the same submission.
+The application checks whether a blockchain record already exists.
+Existing transaction information can be recovered.
+Failed blockchain recording can be retried.
+
+This prevents a retry from creating an unintended second on-chain record.
+
+Teacher–Student Relationships
+
+Teacher access is explicitly controlled by administrators.
+
+The relationship model is many-to-many:
+
+Teacher A ──┬── Student 1
+            ├── Student 2
+            └── Student 3
+
+Teacher B ──┬── Student 2
+            ├── Student 4
+            └── Student 5
+
+A teacher does not automatically gain access to every student.
+
+Administrators can:
+
+Create relationships
+View relationships
+Remove relationships
+
+Historical submission records are preserved when a relationship is removed.
+
+Re-establishing the relationship restores the appropriate current access.
+
+Similarity Analysis
+
+BlockSubmit includes a separate similarity-analysis layer.
+
+This is intentionally different from cryptographic integrity verification.
+
+Integrity asks:
+
+Has this exact document changed?
+
+Similarity asks:
+
+Does this submission contain content similar to another submission?
+
+Similarity analysis can identify:
+
+Similarity percentage
+Potential matching submissions
+Potential source submissions
+Evidence snippets
+Similarity status
+
+Example:
+
+SIMILARITY ANALYSIS
+
+High Similarity
+87%
+
+Potential Match
+Another submission for the same assignment
+
+Evidence
+────────────────────────────────
+matching content / evidence
+────────────────────────────────
+
+Teacher Review Required
+
+Similarity analysis is a signal for review, not an automatic determination of plagiarism.
+
+The system does not automatically declare a student guilty of plagiarism based solely on a similarity score.
+
+Similarity results are protected through role-based access.
+
+Similarity Processing
+
+The similarity system uses:
+
+text extraction
+document normalization
+text shingling
+Jaccard-based similarity comparison
+persisted similarity match records
+
+Supported extraction currently includes:
+
+PDF
+DOCX
+
+PPTX text extraction is not currently treated as a supported similarity-analysis format.
+
+Similarity processing is designed to run separately from the critical submission integrity pipeline so that a similarity-analysis failure does not invalidate the document submission itself.
+
+Audit Timeline
+
+Important submission events are recorded in an audit timeline.
+
+A typical submission may show:
+
+● Submission created
+│
+● File stored
+│
+● SHA-256 generated
+│
+● Blockchain recording
+│
+● Blockchain confirmed
+│
+● Grade created
+
+Audit entries provide a chronological view of important actions and system events.
+
+Audit writes are protected from arbitrary browser-side insertion.
+
+Grading
+
+Teachers can grade authorized submissions using a 0–100 mark range.
+
+Example:
+
+Grade
+
+99 / 100
+
+Grade ownership and teacher authorization are enforced server-side and through database policies.
+
+Grade creation/update events are also represented in the audit timeline.
+
+Security Architecture
+
+BlockSubmit uses multiple layers of security.
+
+Authentication
+
+Supabase Auth handles user authentication.
+
+Authorization
+
+Server-side role checks re-derive the user's role from the database.
+
+Roles:
+
+STUDENT
+TEACHER
+ADMIN
+
+Frontend role-based navigation is only a convenience layer and is not treated as an authorization boundary.
+
+Row Level Security
+
+Supabase RLS provides database-level authorization in addition to server-side checks.
+
+CSRF / Origin Protection
+
+Authenticated state-changing API requests validate their request origin.
+
+Trusted origins are explicitly configured rather than blindly trusting arbitrary request headers.
+
+Private Storage
+
+R2 objects remain private and are accessed using temporary signed URLs.
+
+File Validation
+
+Uploaded files are validated using server-side content inspection.
+
+Server-Side Secrets
+
+Sensitive credentials such as:
+
+Supabase service-role credentials
+Cloudflare R2 secret keys
+Blockchain private keys
+
+are server-side only.
+
+They are never intended for browser/client code.
+
+Smart Contract
+
+The Solidity contract is located at:
+
+contracts/SubmissionRegistry.sol
+
+The contract provides write-once submission records.
+
+The application records:
+
+submissionId
+fileHash
+metadata
+
+The contract prevents recording a second blockchain entry for the same submission identifier.
+
+The application uses the contract's existing record to support safe retry/recovery behavior.
+
+Technology Stack
+Frontend
+Next.js 15.5.25
+React
+TypeScript
+Tailwind CSS
+Backend
+Next.js App Router API routes
+Supabase
+PostgreSQL
+Supabase Auth
+Row Level Security
+Storage
+Cloudflare R2
+S3-compatible object storage
+Presigned URLs
+Cryptography
+SHA-256
+Blockchain
+Solidity
+Ethereum Sepolia
+Hardhat
+Document Processing
+PDF validation/extraction
+DOCX validation/extraction
+PPTX validation
+Text similarity analysis
+Project Structure
+blocksubmit/
+│
+├── app/
+│   ├── admin/
+│   │   ├── relationships/
+│   │   ├── students/
+│   │   └── teachers/
+│   │
+│   ├── api/
+│   │   ├── admin/
+│   │   ├── assignments/
+│   │   ├── grades/
+│   │   └── submissions/
+│   │       ├── [id]/
+│   │       │   ├── download/
+│   │       │   ├── retry/
+│   │       │   ├── similarity/
+│   │       │   ├── timeline/
+│   │       │   └── verify/
+│   │       └── route.ts
+│   │
+│   ├── assignments/
+│   ├── login/
+│   ├── register/
+│   ├── student/
+│   ├── teacher/
+│   ├── submissions/
+│   ├── verify/
+│   ├── globals.css
+│   ├── icon.png
+│   ├── layout.tsx
+│   └── page.tsx
+│
+├── components/
+│   ├── AppShell.tsx
+│   ├── AuditTimeline.tsx
+│   ├── DownloadButton.tsx
+│   ├── GradeDisplay.tsx
+│   ├── GradeForm.tsx
+│   ├── RelationshipManager.tsx
+│   ├── SimilarityCard.tsx
+│   ├── StateMachineStepper.tsx
+│   ├── StatusBadge.tsx
+│   ├── SubmissionUploadForm.tsx
+│   └── VerifyIntegrityCard.tsx
+│
+├── contracts/
+│   └── SubmissionRegistry.sol
+│
+├── lib/
+│   ├── audit.ts
+│   ├── auth.ts
+│   ├── blockchain.ts
+│   ├── file-validation.ts
+│   ├── hash.ts
+│   ├── r2.ts
+│   ├── request-origin.ts
+│   ├── similarity-pipeline.ts
+│   ├── similarity.ts
+│   ├── supabase-browser.ts
+│   ├── supabase-server.ts
+│   └── text-extraction.ts
+│
+├── scripts/
+│   └── deploy.ts
+│
+├── supabase/
+│   └── migrations/
+│       ├── 0001_init.sql
+│       ├── 0002_fix_handle_new_user.sql
+│       ├── 0003_tighten_write_policies.sql
+│       ├── 0004_grade_marks_0_to_100.sql
+│       ├── 0005_signup_roles_and_teacher_invites.sql
+│       ├── 0006_teacher_student_links.sql
+│       └── 0007_similarity_matches.sql
+│
+├── types/
+│   └── index.ts
+│
+├── hardhat.config.ts
+├── middleware.ts
+├── next.config.mjs
+├── package.json
+├── tailwind.config.ts
+└── tsconfig.json
+Environment Variables
+
+Create a local .env.local file.
+
+Never commit .env.local to GitHub.
+
+Required configuration:
+
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+
+R2_ACCOUNT_ID=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET_NAME=
+R2_ENDPOINT=
+R2_PRESIGNED_URL_TTL_SECONDS=300
+
+BLOCKCHAIN_RPC_URL=
+BLOCKCHAIN_CHAIN_ID=11155111
+BLOCKCHAIN_PRIVATE_KEY=
+BLOCKCHAIN_CONTRACT_ADDRESS=
+
+APP_ORIGIN=
+Security
+
+Do not expose:
+
+SUPABASE_SERVICE_ROLE_KEY
+R2_SECRET_ACCESS_KEY
+BLOCKCHAIN_PRIVATE_KEY
+
+to client-side code.
+
+Do not commit them to Git.
+
+Supabase Setup
+
+Run all migrations in order:
+
+0001_init.sql
+0002_fix_handle_new_user.sql
+0003_tighten_write_policies.sql
+0004_grade_marks_0_to_100.sql
+0005_signup_roles_and_teacher_invites.sql
+0006_teacher_student_links.sql
+0007_similarity_matches.sql
+
+These migrations establish the application schema, authorization policies, role protections, teacher-student relationships, grading constraints, and similarity-match storage.
+
+Authentication
+
+New users register through the standard registration flow.
+
+Normal registration creates:
+
+STUDENT
+
+Users do not select ADMIN or TEACHER from the registration interface.
+
+Teacher and administrator privileges are controlled through server-side/admin workflows.
+
+For local development, Supabase email confirmation can be disabled:
+
+Supabase Dashboard
+→ Authentication
+→ Providers
+→ Email
+→ Confirm email
+→ OFF
+
+For production deployments, email confirmation should be configured according to the deployment's authentication requirements.
+
+Blockchain Deployment
+
+Install dependencies:
+
 npm install
+
+Compile the smart contract:
+
+npm run compile
+
+Deploy to Sepolia:
+
+npm run deploy:sepolia
+
+The deployment script uses:
+
+BLOCKCHAIN_RPC_URL=
+BLOCKCHAIN_CHAIN_ID=11155111
+BLOCKCHAIN_PRIVATE_KEY=
+
+After deployment, configure:
+
+BLOCKCHAIN_CONTRACT_ADDRESS=
+
+with the deployed contract address.
+
+Never commit the blockchain private key.
+
+Running Locally
+
+Install dependencies:
+
+npm install
+
+Start the development server:
+
 npm run dev
-```
 
-Visit `http://localhost:3000`. Register a user (defaults to STUDENT role);
-promote a user to TEACHER/ADMIN directly in Supabase:
+Open:
 
-```sql
-update profiles set role = 'TEACHER' where id = '<user-uuid>';
-```
+http://localhost:3000
 
-### Mutation request origins
+For production validation:
 
-Authenticated state-changing API requests require an exact same-origin
-`Origin` header. In production, set the server-only `APP_ORIGIN` environment
-variable to the deployed BlockSubmit origin, for example
-`https://blocksubmit.example.com`. Multiple explicitly trusted origins may be
-comma-separated when needed. Vercel preview deployments also accept the
-platform-provided `VERCEL_URL`; local development permits only loopback
-origins on the supported local dev ports. Arbitrary request `Host` or
-`Origin` values are never used as configuration.
+npm run typecheck
+npm run lint
+npm run build
+End-to-End Workflow
 
-### Deploying
+A typical workflow is:
 
-- Push to GitHub, import into Vercel, set all `.env` vars in the Vercel
-  project settings.
-- Supabase and R2 need no separate deployment — they're already hosted.
+Admin
+  │
+  ├── Creates/promotes teacher
+  │
+  └── Links teacher ↔ student
+            │
+            ▼
+Teacher
+  │
+  └── Creates assignment
+            │
+            ▼
+Student
+  │
+  └── Uploads document
+            │
+            ▼
+Server Validation
+            │
+            ▼
+Private R2 Storage
+            │
+            ▼
+SHA-256
+            │
+            ▼
+Ethereum Sepolia
+            │
+            ▼
+Confirmed Submission
+            │
+            ├── Integrity Verification
+            │
+            ├── Similarity Analysis
+            │
+            ├── Teacher Grading
+            │
+            └── Audit Timeline
+Verification Flow
 
-## Security notes
+For a confirmed submission:
 
-- Every protected route re-derives the user's role from `profiles` via
-  `lib/auth.ts` — the frontend's role-based UI is convenience only.
-- RLS policies in the migration are a second, independent authorization
-  layer at the database level (defense in depth alongside the API checks).
-- Files are never served from a permanent URL; every download goes through
-  a presigned URL with a 5-minute default TTL, generated only after an
-  ownership/role check.
-- `audit_logs` is written via the service-role client only — there is no
-  client-facing insert policy, so audit entries can't be forged from the
-  browser.
+Retrieve the authorized document from private R2.
+Recompute its SHA-256 fingerprint.
+Retrieve the blockchain record.
+Compare the recomputed hash with the recorded hash.
+Return the integrity result.
 
-## Idempotency strategy (V1)
+Possible outcomes include:
 
-The failure case that matters most: a blockchain transaction confirms
-on-chain, then the server process dies (or the HTTP request times out)
-before PostgreSQL is updated to `CONFIRMED`. A naive retry would call
-`recordSubmission` again and either waste gas on a reverted tx or, worse,
-silently succeed in creating a second on-chain entry if the contract
-didn't guard against it.
+VERIFIED
 
-The chosen strategy layers three things, each doing one job:
+or:
 
-1. **Contract-level write-once guard** — `SubmissionRegistry` reverts on
-   a second `recordSubmission` call for the same `submissionId`. This is
-   the actual source of truth for "has this been recorded" and is what
-   ultimately prevents a duplicate record, no matter what the app does.
-2. **App-level idempotent recorder** — `recordSubmissionOnChain()` in
-   `lib/blockchain.ts` checks `hasRecord()` before sending a transaction.
-   If a record already exists, it recovers the original `txHash` /
-   `blockNumber` from the `SubmissionRecorded` event log instead of
-   sending a new (guaranteed-to-revert) transaction. This makes the
-   function itself safe to call repeatedly with the same submission.
-3. **DB status as a resumability hint, not a lock** — `RECORDING` and
-   `BLOCKCHAIN_FAILED` are both treated as retryable (see
-   `RETRYABLE_STATUSES` in `types/index.ts`), because a crash can leave a
-   row in either one. The retry endpoint re-enters step 4 of the pipeline
-   safely because step (2) above makes it idempotent regardless of which
-   of those two states it starts from.
+TAMPERED
 
-The DB's `UNIQUE(assignment_id, student_id)` constraint handles the
-separate case of a retried *upload* request (before any submission row
-exists): a second `INSERT` attempt fails with Postgres error `23505`,
-and the route returns the existing submission's id/status rather than
-creating a duplicate.
+A TAMPERED result means the current document bytes no longer match the fingerprint recorded on-chain.
 
-## Validated (as of this build)
+Testing & Validation
 
-- `npm run typecheck` (`tsc --noEmit`) — passes, zero errors.
-- `npm run lint` (`next lint`, `next/core-web-vitals`) — passes, zero
-  warnings.
-- `npm run build` (`next build`) — production build succeeds; every
-  `api/**` route and `/verify/[submissionId]` correctly compiles to a
-  dynamic (`ƒ`) route, not statically prerendered.
-- Smoke-tested against a locally started production server with
-  placeholder credentials (no real Supabase/R2/chain access): every
-  protected route (`/api/assignments` POST, `/api/submissions` POST,
-  `.../download`, `.../retry`, `.../verify`, `/api/grades`) correctly
-  returns `401` with no session; `/api/health` correctly reports
-  `503`/`degraded` with each dependency listed `unavailable` when
-  credentials are placeholders; the public `/verify/[id]` page correctly
-  handles a malformed ID, and a well-formed but nonexistent ID, without
-  errors.
-- Not yet tested (requires real credentials — see "Manual setup" below):
-  an actual end-to-end submission through a real Supabase project, R2
-  bucket, and deployed Sepolia contract; RLS policies exercised against
-  two real user sessions; an actual duplicate-retry against a live chain.
+The current build has been validated with:
 
-## Email confirmation (dev vs. production)
+npm run typecheck
+npm run lint
+npm run build
 
-Whether `signUp()` returns an active session immediately or requires the
-user to click a confirmation link first is controlled entirely by the
-Supabase **project's** own setting — not by anything in this codebase:
+Manual functional testing has covered:
 
-**Supabase Dashboard → Authentication → Providers → Email → "Confirm
-email"**
+Student registration/login
+Teacher access
+Admin access
+Teacher-student relationships
+Assignment creation
+Student submission
+File validation
+Private R2 storage
+Submission state progression
+SHA-256 generation
+Ethereum Sepolia recording
+Blockchain retry/recovery
+View document
+Download document
+Integrity verification
+Teacher grading
+Audit timeline
+Similarity detection
+Similarity evidence
+Role-based similarity visibility
+Student privacy
+Duplicate submission prevention
+Teacher ownership/access restrictions
+Known Limitations
+Similarity analysis
 
-- **Development/demo**: turn this **off**. `supabase.auth.signUp()` then
-  returns a session directly; `app/register/page.tsx` detects that
-  (`data.session` is present) and redirects straight to the student
-  dashboard — no email step at all.
-- **Production**: turn this **on**. `signUp()` then returns no session;
-  the same registration page detects that and shows a "check your email"
-  state instead, and the user logs in normally after confirming.
+Similarity analysis is intended as a review signal.
 
-The app code doesn't need to know which mode it's in — it branches on
-whatever `signUp()` actually returned, so flipping this one Supabase
-setting is the entire configuration change between the two modes. There
-is no application-level flag to misconfigure or accidentally leave in
-the wrong state for production, because there isn't one — the toggle
-lives where it should, in Supabase's own auth settings.
+A similarity score does not independently establish plagiarism.
 
-## Known V1 limitations
+Teacher review is required before making an academic determination.
 
-- **Deadlines are informational, not enforced.** The student dashboard
-  shows a "past due" indicator once `assignment.deadline` has passed, but
-  `POST /api/submissions` does not check the deadline and will accept a
-  late submission. This is intentional for V1 — the original spec never
-  listed deadline enforcement as a requirement — not an oversight. Adding
-  a server-side deadline check (reject with 409 if `now() > deadline`) is
-  a small, isolated change if you want it: it belongs in
-  `app/api/submissions/route.ts`, right after the assignment lookup and
-  before the `INSERT`.
+Document extraction
 
-- Student/teacher dashboard pages (`app/dashboard/student`,
-  `app/dashboard/teacher`) and the assignment-creation UI are not yet
-  wired up — the API routes and components (`SubmissionUploadForm`,
-  `VerifyIntegrityCard`, `StatusBadge`) exist and are validated, but
-  nothing calls them from a dashboard page yet.
-- No `PATCH`/`DELETE` route for assignments yet (RLS policies for
-  teacher update/delete already exist in the migration; the API surface
-  to use them is still to be added).
-- No automated test suite (unit/integration) — validation so far is
-  typecheck + lint + build + manual HTTP smoke tests, not a CI test
-  suite.
-- Single server-held blockchain signer (see "Trust model" above).
+PDF and DOCX text extraction are supported for similarity analysis.
 
-## What's implemented vs. left as an exercise
+PPTX similarity extraction is currently not supported.
 
-Implemented and validated (typecheck + lint + build + smoke test, see
-above): schema + RLS (including the role-escalation guard and the
-removal of student direct-update access to `submissions`), RBAC helpers,
-full upload state machine with idempotent retry, R2 presigned
-upload/download, SHA-256 hashing, Solidity contract, verification flow
-(app + public page), grading, granular audit logging, health check, core
-UI components.
+Blockchain signer
 
-Left as an exercise (see "Known V1 limitations" above for the full list):
-seed data for local demos, an automated test suite. (Dashboard pages,
-assignment edit/delete, and the Hardhat deployment setup — previously
-listed here as gaps — have since been implemented.)
+The current architecture uses a server-side signer for blockchain writes.
+
+A production system requiring protection against a compromised application server could move toward a role-gated multi-signer or user-controlled signing architecture.
+
+Automated tests
+
+The project has validation through typechecking, linting, production builds, deterministic similarity tests, security checks, and manual end-to-end testing.
+
+A larger automated integration/E2E suite remains a future improvement.
+
+Deadline enforcement
+
+Assignment deadlines are currently represented in the application but are not intended to be a hard server-side submission cutoff in the current version.
+
+Future Improvements
+
+Potential future work includes:
+
+Automated integration/E2E test suite
+Background job processing for similarity analysis
+Expanded document text extraction
+Malware scanning pipeline
+Advanced similarity algorithms
+Better similarity explanations
+Production-grade rate limiting
+Security headers/CSP hardening
+Background blockchain job processing
+Multi-signer blockchain authorization
+Advanced analytics dashboards
+Notification system
+Email-based teacher invitations
+Production monitoring and observability
+Security Philosophy
+
+BlockSubmit follows a defense-in-depth approach.
+
+Authentication
+      +
+Server-side Authorization
+      +
+Supabase RLS
+      +
+Private R2 Storage
+      +
+Temporary Signed URLs
+      +
+Server-side File Validation
+      +
+SHA-256 Integrity
+      +
+Blockchain Proof
+      +
+Audit Logging
+      +
+Origin Validation
+
+No single layer is intended to provide the entire security boundary.
+
+Project Status
+
+Current status: Functional development build
+
+The core BlockSubmit workflow is implemented and manually validated across the major student, teacher, and administrator workflows.
+
+The project is intended as an academic/security engineering project demonstrating:
+
+Full-stack development
+Secure file handling
+Role-based authorization
+Database security
+Cloud object storage
+Cryptographic integrity
+Blockchain integration
+Fault-tolerant processing
+Document analysis
+Similarity detection
+Auditability
+
+License
+
+This project is intended for educational and portfolio purposes.
+

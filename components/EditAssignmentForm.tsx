@@ -1,16 +1,13 @@
 'use client';
 
-// Teacher-facing "edit assignment" form, posting to the existing
-// PATCH /api/assignments/[id] route added alongside this component.
-// Client-side checks are for usability only — the server re-validates
-// everything and re-checks ownership (see app/api/assignments/[id]/route.ts).
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Edit3, Loader2 } from 'lucide-react';
+import { Modal } from './Modal';
+import { useToast } from './ToastProvider';
 import type { Assignment } from '@/types';
 
 function toLocalInputValue(iso: string): string {
-  // <input type="datetime-local"> needs "YYYY-MM-DDTHH:mm" in local time,
-  // not the ISO string's UTC representation.
   const d = new Date(iso);
   const offset = d.getTimezoneOffset();
   const local = new Date(d.getTime() - offset * 60000);
@@ -25,6 +22,7 @@ export function EditAssignmentForm({ assignment }: { assignment: Assignment }) {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const router = useRouter();
+  const toast = useToast();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -53,79 +51,100 @@ export function EditAssignmentForm({ assignment }: { assignment: Assignment }) {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(typeof data.error === 'string' ? data.error : 'Could not update assignment');
+        const msg = typeof data.error === 'string' ? data.error : 'Could not update assignment';
+        setError(msg);
+        toast.error('Update failed', msg);
         return;
       }
+      toast.success('Assignment updated', `Changes to "${title}" saved.`);
       setEditing(false);
       router.refresh();
     } catch {
-      setError('Network error — please try again');
+      const msg = 'Network error — please try again';
+      setError(msg);
+      toast.error('Network error', msg);
     } finally {
       setSubmitting(false);
     }
   }
 
-  if (!editing) {
-    return (
+  return (
+    <>
       <button
         onClick={() => setEditing(true)}
-        className="rounded-lg border border-ink-200 px-4 py-2 text-sm font-medium text-ink-700 hover:bg-ink-50"
+        className="btn-secondary text-xs gap-1.5 active:scale-[0.98] transition-all"
       >
-        Edit assignment
+        <Edit3 className="h-3.5 w-3.5 text-ink-600" />
+        <span>Edit Details</span>
       </button>
-    );
-  }
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-3 card-padded">
-      <h2 className="font-medium text-ink-900">Edit assignment</h2>
-      <div>
-        <label className="label">Title</label>
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          maxLength={200}
-          className="input mt-1"
-        />
-      </div>
-      <div>
-        <label className="label">Description</label>
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          maxLength={5000}
-          rows={3}
-          className="input mt-1"
-        />
-      </div>
-      <div>
-        <label className="label">Deadline</label>
-        <input
-          type="datetime-local"
-          value={deadline}
-          onChange={(e) => setDeadline(e.target.value)}
-          className="input mt-1"
-        />
-      </div>
+      <Modal
+        isOpen={editing}
+        onClose={() => setEditing(false)}
+        title="Edit Assignment"
+        description="Update assignment details or deadline."
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="label mb-1">Title</label>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              maxLength={200}
+              className="input"
+            />
+          </div>
+          <div>
+            <label className="label mb-1">Description</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              maxLength={5000}
+              rows={3}
+              className="input text-sm"
+            />
+          </div>
+          <div>
+            <label className="label mb-1">Deadline</label>
+            <input
+              type="datetime-local"
+              value={deadline}
+              onChange={(e) => setDeadline(e.target.value)}
+              className="input"
+            />
+          </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && (
+            <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+              {error}
+            </div>
+          )}
 
-      <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={submitting}
-          className="btn-primary"
-        >
-          {submitting ? 'Saving…' : 'Save changes'}
-        </button>
-        <button
-          type="button"
-          onClick={() => setEditing(false)}
-          className="btn-secondary"
-        >
-          Cancel
-        </button>
-      </div>
-    </form>
+          <div className="mt-6 flex justify-end gap-3 border-t border-ink-100 pt-4">
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="btn-secondary text-xs"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="btn-primary text-xs"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                'Save Changes'
+              )}
+            </button>
+          </div>
+        </form>
+      </Modal>
+    </>
   );
 }

@@ -18,6 +18,7 @@
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.45.4",
     "ethers": "^6.13.2",
+    "lucide-react": "^1.48.0",
     "mammoth": "^1.12.3",
     "next": "15.5.25",
     "pdf-parse": "^2.4.5",

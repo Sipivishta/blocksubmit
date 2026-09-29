@@ -1,11 +1,7 @@
 'use client';
 
-// Teacher/admin-only panel on the submission details page. Fetches from
-// the existing GET /api/submissions/[id]/similarity route, which is
-// itself the authorization boundary (students get 403 there regardless
-// of whether this component is ever rendered for them — this component
-// is an extra UI-layer precaution, not the real boundary).
 import { useEffect, useState } from 'react';
+import { AlertTriangle, Info, CheckCircle, ShieldAlert, Loader2 } from 'lucide-react';
 
 interface Match {
   score: number;
@@ -14,10 +10,10 @@ interface Match {
   otherStudentName: string;
 }
 
-function scoreStyle(score: number): { label: string; className: string } {
-  if (score >= 70) return { label: 'High similarity', className: 'border-red-200 bg-red-50 text-red-700' };
-  if (score >= 40) return { label: 'Possible match', className: 'border-amber-200 bg-amber-50 text-amber-700' };
-  return { label: 'Low similarity', className: 'border-ink-200 bg-ink-50 text-ink-600' };
+function scoreStyle(score: number): { label: string; bg: string; border: string; text: string; icon: React.ComponentType<{ className?: string }> } {
+  if (score >= 70) return { label: 'High Similarity Risk', bg: 'bg-red-50/80', border: 'border-red-200', text: 'text-red-900', icon: ShieldAlert };
+  if (score >= 40) return { label: 'Moderate Similarity', bg: 'bg-amber-50/80', border: 'border-amber-200', text: 'text-amber-900', icon: AlertTriangle };
+  return { label: 'Low Similarity', bg: 'bg-ink-50/80', border: 'border-ink-200', text: 'text-ink-800', icon: Info };
 }
 
 export function SimilarityCard({ submissionId }: { submissionId: string }) {
@@ -42,38 +38,67 @@ export function SimilarityCard({ submissionId }: { submissionId: string }) {
     };
   }, [submissionId]);
 
-  if (error) return <p className="text-sm text-red-600">{error}</p>;
-  if (!matches) return <p className="text-sm text-ink-400">Loading…</p>;
+  if (error) return <p className="text-sm text-red-600 font-medium">{error}</p>;
+  if (!matches) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-ink-500 py-4">
+        <Loader2 className="h-4 w-4 animate-spin text-brand-600" />
+        <span>Scanning text extraction pipeline for similarity matches...</span>
+      </div>
+    );
+  }
   if (matches.length === 0) {
-    return <p className="text-sm text-ink-400">No similar submissions detected for this assignment.</p>;
+    return (
+      <div className="flex items-center gap-2 text-sm text-emerald-800 bg-emerald-50/70 p-3 rounded-xl border border-emerald-200">
+        <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
+        <span>No significant content similarity detected across enrolled peer submissions.</span>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {matches.map((m) => {
         const style = scoreStyle(m.score);
+        const Icon = style.icon;
+
         return (
-          <div key={m.otherSubmissionId} className={`rounded-lg border p-4 ${style.className}`}>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold">{style.label}</span>
-              <span className="text-sm font-semibold">{m.score}%</span>
+          <div key={m.otherSubmissionId} className={`rounded-xl border p-4 shadow-sm ${style.bg} ${style.border}`}>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Icon className="h-4 w-4 shrink-0 text-current" />
+                <span className={`text-sm font-bold ${style.text}`}>{style.label}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-20 bg-black/10 rounded-full h-2 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${m.score >= 70 ? 'bg-red-600' : m.score >= 40 ? 'bg-amber-500' : 'bg-brand-500'}`}
+                    style={{ width: `${m.score}%` }}
+                  />
+                </div>
+                <span className="text-xs font-bold tabular-nums text-ink-900">{m.score}%</span>
+              </div>
             </div>
-            <p className="mt-1 text-xs opacity-80">Potential match: {m.otherStudentName}</p>
+
+            <p className="mt-2 text-xs text-ink-700">
+              Matched with peer: <span className="font-semibold text-ink-900">{m.otherStudentName}</span>
+            </p>
+
             {m.evidence.length > 0 && (
-              <div className="mt-2 space-y-1">
+              <div className="mt-3 space-y-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-ink-400">Sample Extract Evidence</p>
                 {m.evidence.slice(0, 3).map((phrase, i) => (
-                  <p key={i} className="truncate rounded bg-white/60 px-2 py-1 font-mono text-xs">
+                  <div key={i} className="truncate rounded-md border border-ink-200/60 bg-white/90 px-2.5 py-1.5 font-mono text-xs text-ink-800 shadow-sm">
                     &quot;{phrase}&quot;
-                  </p>
+                  </div>
                 ))}
               </div>
             )}
           </div>
         );
       })}
-      <p className="text-xs text-ink-400">
-        This is an automated similarity signal, not a determination of academic misconduct. Review the
-        evidence and make the final judgment yourself.
+      <p className="text-xs text-ink-400 leading-relaxed">
+        This automated metric is an assistance tool. Final integrity determination remains subject to academic review.
       </p>
     </div>
   );

@@ -1,12 +1,3 @@
-// Assignment details page: /assignments/[id]
-// Shared across all roles — any authenticated user can view an assignment
-// (matches the existing "assignments: everyone authenticated can read" RLS
-// policy; there's no ownership restriction on reading). What's rendered
-// below the shared info differs by role/ownership:
-//   - STUDENT: their own submission status + a Submit/View action
-//   - the assignment's own TEACHER: edit/delete controls + a link to the
-//     submissions list at /teacher/assignments/[id]
-//   - anyone else (a different teacher, an admin): read-only
 export const runtime = 'nodejs';
 
 import { redirect, notFound } from 'next/navigation';
@@ -19,6 +10,7 @@ import { EditAssignmentForm } from '@/components/EditAssignmentForm';
 import { DeleteAssignmentButton } from '@/components/DeleteAssignmentButton';
 import { AppShell } from '@/components/AppShell';
 import type { Assignment, Profile, Submission } from '@/types';
+import { ArrowLeft, Calendar, User, FileText, ArrowRight, CheckCircle2 } from 'lucide-react';
 
 export default async function AssignmentDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -58,61 +50,98 @@ export default async function AssignmentDetailsPage({ params }: { params: Promis
   const teacher = teacherProfile as Pick<Profile, 'full_name' | 'department'> | null;
 
   return (
-    <AppShell title="Assignment">
-      <div className="mx-auto max-w-2xl p-4 sm:p-6">
-        <Link
-          href={user.role === 'TEACHER' ? '/teacher' : '/student'}
-          className="text-sm text-ink-400 hover:text-ink-900"
-        >
-          ← Back
-        </Link>
+    <AppShell title="Assignment Details">
+      <div className="mx-auto max-w-3xl p-4 sm:p-8 space-y-6">
+        <div>
+          <Link
+            href={user.role === 'TEACHER' ? '/teacher' : '/student'}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink-500 hover:text-ink-900 transition-colors mb-3"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Back to {user.role === 'TEACHER' ? 'Teaching Workspace' : 'Dashboard'}</span>
+          </Link>
 
-        <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
+          <div className="page-intro">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="eyebrow">Academic Coursework</p>
+                <h1 className="text-2xl font-bold tracking-tight text-ink-950 sm:text-3xl">{a.title}</h1>
+                {teacher && (
+                  <div className="flex items-center gap-1.5 mt-2 text-xs font-medium text-ink-600">
+                    <User className="h-3.5 w-3.5 text-ink-400" />
+                    <span>Instructor: {teacher.full_name}</span>
+                    {teacher.department && <span className="text-ink-400">· {teacher.department}</span>}
+                  </div>
+                )}
+              </div>
+              {mySubmission && <StatusBadge status={mySubmission.status} />}
+            </div>
+          </div>
+        </div>
+
+        {/* Description & Deadline Card */}
+        <div className="card-padded bg-white shadow-card space-y-4">
           <div>
-            <h1 className="text-2xl font-semibold text-ink-900">{a.title}</h1>
-            {teacher && (
-              <p className="mt-1 text-sm text-ink-400">
-                {teacher.full_name}
-                {teacher.department ? ` · ${teacher.department}` : ''}
-              </p>
+            <h2 className="text-xs font-bold uppercase tracking-wider text-ink-400 mb-2">Submission Guidelines</h2>
+            {a.description ? (
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink-800">{a.description}</p>
+            ) : (
+              <p className="text-sm text-ink-400 italic">No instructions provided for this assignment.</p>
             )}
           </div>
-          {mySubmission && <StatusBadge status={mySubmission.status} />}
+
+          <div className="flex items-center gap-2 border-t border-ink-100 pt-3 text-xs">
+            <Calendar className="h-4 w-4 text-ink-400" />
+            <span className={`font-semibold ${overdue ? 'text-amber-700' : 'text-ink-600'}`}>
+              Deadline: {new Date(a.deadline).toLocaleString()}
+              {overdue ? ' (Past Due)' : ''}
+            </span>
+          </div>
         </div>
 
-        <div className="mt-6 card-padded">
-          {a.description ? (
-            <p className="whitespace-pre-wrap text-sm text-ink-700">{a.description}</p>
-          ) : (
-            <p className="text-sm text-ink-300">No description provided.</p>
-          )}
-          <p className={`mt-4 text-sm ${overdue ? 'text-red-600' : 'text-ink-400'}`}>
-            Deadline: {new Date(a.deadline).toLocaleString()}
-            {overdue ? ' (past due)' : ''}
-          </p>
-        </div>
-
+        {/* Student Submission View/Form */}
         {user.role === 'STUDENT' && (
-          <div className="mt-6">
+          <div>
             {mySubmission ? (
-              <Link href={`/submissions/${mySubmission.id}`} className="text-sm font-medium text-ink-900 underline">
-                View your submission →
-              </Link>
+              <div className="card-padded bg-emerald-50/70 border-emerald-200 space-y-3">
+                <div className="flex items-center gap-2 text-emerald-900 font-bold text-sm">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                  <span>Work Submitted</span>
+                </div>
+                <p className="text-xs text-emerald-800">
+                  Your work has been fingerprinted and submitted. View your evidence dossier for status updates.
+                </p>
+                <Link
+                  href={`/submissions/${mySubmission.id}`}
+                  className="btn-primary py-2.5 px-4 text-xs inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 border-none shadow-sm"
+                >
+                  <span>View Submission & Proof</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
             ) : (
               <SubmissionUploadForm assignmentId={a.id} />
             )}
           </div>
         )}
 
+        {/* Teacher Controls */}
         {isOwner && (
-          <div className="mt-6 space-y-3">
-            <div className="flex flex-wrap gap-2">
+          <div className="card-padded bg-white space-y-4">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-ink-400">Instructor Controls</h2>
+            <div className="flex flex-wrap gap-3">
               <EditAssignmentForm assignment={a} />
               <DeleteAssignmentButton assignmentId={a.id} />
             </div>
-            <Link href={`/teacher/assignments/${a.id}`} className="block text-sm font-medium text-ink-900 underline">
-              View submissions →
-            </Link>
+            <div className="border-t border-ink-100 pt-3">
+              <Link
+                href={`/teacher/assignments/${a.id}`}
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-600 hover:underline"
+              >
+                <span>View All Cohort Submissions</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
           </div>
         )}
       </div>

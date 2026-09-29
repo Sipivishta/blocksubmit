@@ -1,20 +1,14 @@
-// Teacher dashboard: /teacher
-// Lists the teacher's own assignments (existing GET /api/assignments
-// returns all assignments; this page additionally filters to teacher_id
-// = the signed-in user, since that's what "my assignments" means here)
-// plus a submission count per assignment, and the create-assignment form.
 export const runtime = 'nodejs';
 
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
 import { requireRole, UnauthorizedError, ForbiddenError } from '@/lib/auth';
 import { createServerClient } from '@/lib/supabase-server';
-import { AssignmentForm } from '@/components/AssignmentForm';
 import { StatCard } from '@/components/StatCard';
 import { AppShell } from '@/components/AppShell';
-import { EmptyState } from '@/components/EmptyState';
+import { TeacherAssignmentList } from '@/components/TeacherAssignmentList';
 import { dashboardPathForRole } from '@/lib/redirect-for-role';
 import type { Assignment } from '@/types';
+import { BookOpen } from 'lucide-react';
 
 export default async function TeacherDashboard() {
   let teacher;
@@ -33,91 +27,71 @@ export default async function TeacherDashboard() {
     .eq('teacher_id', teacher.id)
     .order('deadline', { ascending: true });
 
-  const assignmentIds = ((assignments ?? []) as Assignment[]).map((a) => a.id);
+  const assignmentList = (assignments ?? []) as Assignment[];
+  const assignmentIds = assignmentList.map((a) => a.id);
   const { data: submissions } = assignmentIds.length
     ? await supabase.from('submissions').select('id, assignment_id, status').in('assignment_id', assignmentIds)
     : { data: [] as { id: string; assignment_id: string; status: string }[] };
 
-  const countByAssignment = new Map<string, number>();
-  const confirmedByAssignment = new Map<string, number>();
+  const countObj: Record<string, number> = {};
+  const confirmedObj: Record<string, number> = {};
+
   for (const s of submissions ?? []) {
-    countByAssignment.set(s.assignment_id, (countByAssignment.get(s.assignment_id) ?? 0) + 1);
+    countObj[s.assignment_id] = (countObj[s.assignment_id] ?? 0) + 1;
     if (s.status === 'CONFIRMED') {
-      confirmedByAssignment.set(s.assignment_id, (confirmedByAssignment.get(s.assignment_id) ?? 0) + 1);
+      confirmedObj[s.assignment_id] = (confirmedObj[s.assignment_id] ?? 0) + 1;
     }
   }
 
   const totalSubmissions = submissions?.length ?? 0;
   const totalConfirmed = (submissions ?? []).filter((s) => s.status === 'CONFIRMED').length;
-  // "Pending review" is a UX label, not a status: any submission not yet
-  // confirmed on-chain and not in a hard-failure state still needs the
-  // teacher's attention once it does confirm — so we count everything that
-  // isn't CONFIRMED or a *_FAILED terminal state.
   const pendingReview = (submissions ?? []).filter(
     (s) => !['CONFIRMED', 'UPLOAD_FAILED', 'HASH_FAILED'].includes(s.status)
   ).length;
 
   const stats = [
-    { label: 'Assignments', value: ((assignments ?? []) as Assignment[]).length },
-    { label: 'Total submissions', value: totalSubmissions },
-    { label: 'Pending review', value: pendingReview },
-    { label: 'Confirmed on-chain', value: totalConfirmed }
+    { label: 'Assignments', value: assignmentList.length, subtext: 'Owned coursework' },
+    { label: 'Total submissions', value: totalSubmissions, subtext: 'Received work' },
+    { label: 'Pending review', value: pendingReview, subtext: 'Awaiting grading' },
+    { label: 'Confirmed on-chain', value: totalConfirmed, subtext: 'Integrity sealed' }
   ];
 
   return (
-    <AppShell title="Dashboard">
-      <div className="mx-auto max-w-5xl p-4 sm:p-8">
-        <div className="page-intro">
-          <p className="eyebrow">Teaching workspace</p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-ink-900 sm:text-3xl">Review with confidence.</h1>
-          <p className="mt-2 text-sm text-ink-500">Signed in as {teacher.full_name}. Monitor submissions and their proof status in one place.</p>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {stats.map((stat) => (
-            <StatCard key={stat.label} label={stat.label} value={stat.value} />
-          ))}
-        </div>
-
-        <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-medium text-ink-900">Your assignments</h2>
-          <AssignmentForm />
-        </div>
-
-        <div className="mt-3 space-y-3">
-          {((assignments ?? []) as Assignment[]).length === 0 && (
-            <EmptyState
-              title="No assignments yet"
-              description="Create your first assignment to start collecting submissions."
-            />
-          )}
-
-          {((assignments ?? []) as Assignment[]).map((assignment) => (
-            <div key={assignment.id} className="card-padded">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h3 className="font-medium text-ink-900">
-                    <Link href={`/assignments/${assignment.id}`} className="hover:underline">
-                      {assignment.title}
-                    </Link>
-                  </h3>
-                  <p className="mt-1 text-xs text-ink-400">
-                    Deadline: {new Date(assignment.deadline).toLocaleString()}
-                  </p>
-                </div>
-                <div className="text-right text-xs text-ink-400">
-                  <p>{countByAssignment.get(assignment.id) ?? 0} submitted</p>
-                  <p>{confirmedByAssignment.get(assignment.id) ?? 0} confirmed</p>
-                </div>
-              </div>
-              <Link
-                href={`/teacher/assignments/${assignment.id}`}
-                className="mt-3 inline-block text-sm font-medium text-ink-900 underline"
-              >
-                View submissions →
-              </Link>
+    <AppShell title="Teaching Workspace">
+      <div className="mx-auto max-w-5xl p-4 sm:p-8 space-y-8">
+        {/* Intro */}
+        <div className="page-intro relative overflow-hidden">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-2xl bg-violet-600 text-white shadow-lift">
+              <BookOpen className="h-6 w-6 stroke-[2]" />
             </div>
+            <div>
+              <p className="eyebrow text-violet-600">Instructor Workspace</p>
+              <h1 className="text-2xl font-bold tracking-tight text-ink-950 sm:text-3xl">
+                Review with confidence.
+              </h1>
+            </div>
+          </div>
+          <p className="mt-3 text-sm text-ink-600 max-w-xl leading-relaxed">
+            Signed in as <span className="font-semibold text-ink-900">{teacher.full_name}</span>. Create assignments, evaluate student submissions, and inspect immutable audit evidence.
+          </p>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {stats.map((stat) => (
+            <StatCard key={stat.label} label={stat.label} value={stat.value} subtext={stat.subtext} />
           ))}
+        </div>
+
+        {/* Assignments section */}
+        <div>
+          <h2 className="text-lg font-bold tracking-tight text-ink-900 mb-4">Your Created Assignments</h2>
+          <TeacherAssignmentList
+            assignments={assignmentList}
+            countByAssignment={countObj}
+            confirmedByAssignment={confirmedObj}
+          />
         </div>
       </div>
     </AppShell>

@@ -1,15 +1,24 @@
-// Consistent empty-state block for lists with nothing in them yet.
-// Presentational only — the caller decides when there's nothing to show.
-export function EmptyState({ title, description }: { title: string; description?: string }) {
+import React from 'react';
+import { Inbox, FileQuestion, SearchX } from 'lucide-react';
+
+interface EmptyStateProps {
+  title: string;
+  description?: string;
+  action?: React.ReactNode;
+  icon?: 'inbox' | 'search' | 'file';
+}
+
+export function EmptyState({ title, description, action, icon = 'inbox' }: EmptyStateProps) {
+  const IconComponent = icon === 'search' ? SearchX : icon === 'file' ? FileQuestion : Inbox;
+
   return (
-    <div className="card-padded flex flex-col items-center justify-center py-12 text-center">
-      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-ink-100">
-        <svg viewBox="0 0 20 20" fill="none" className="h-5 w-5 text-ink-400">
-          <rect x="4" y="4" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.4" />
-        </svg>
+    <div className="surface-grid card relative flex flex-col items-center justify-center p-8 sm:p-12 text-center border-dashed border-2 border-ink-200 bg-white/70">
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 shadow-sm border border-brand-100">
+        <IconComponent className="h-6 w-6 stroke-[1.5]" />
       </div>
-      <p className="text-sm font-medium text-ink-700">{title}</p>
-      {description && <p className="mt-1 max-w-xs text-sm text-ink-400">{description}</p>}
+      <h3 className="text-base font-semibold text-ink-900 tracking-tight">{title}</h3>
+      {description && <p className="mt-1.5 max-w-sm text-sm text-ink-500 leading-relaxed">{description}</p>}
+      {action && <div className="mt-5">{action}</div>}
     </div>
   );
 }

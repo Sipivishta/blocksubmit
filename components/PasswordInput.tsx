@@ -1,15 +1,13 @@
 'use client';
 
-// Shared password field with a show/hide toggle, used by both login and
-// register. Purely a UI convenience — never affects what gets sent to
-// Supabase Auth.
 import { useState } from 'react';
+import { Eye, EyeOff, Lock } from 'lucide-react';
 
 export function PasswordInput({
   id,
   value,
   onChange,
-  placeholder = 'Password',
+  placeholder = '••••••••',
   autoComplete
 }: {
   id?: string;
@@ -21,7 +19,10 @@ export function PasswordInput({
   const [visible, setVisible] = useState(false);
 
   return (
-    <div className="relative">
+    <div className="relative flex items-center">
+      <div className="absolute left-3 pointer-events-none text-ink-400">
+        <Lock className="h-4 w-4" />
+      </div>
       <input
         id={id}
         type={visible ? 'text' : 'password'}
@@ -29,15 +30,15 @@ export function PasswordInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         autoComplete={autoComplete}
-        className="input pr-16"
+        className="input pl-9 pr-10"
       />
       <button
         type="button"
         onClick={() => setVisible((v) => !v)}
-        className="absolute inset-y-0 right-0 px-3 text-xs font-medium text-ink-400 hover:text-ink-800"
+        className="absolute right-2.5 p-1 text-ink-400 hover:text-ink-700 rounded-md transition-colors"
         aria-label={visible ? 'Hide password' : 'Show password'}
       >
-        {visible ? 'Hide' : 'Show'}
+        {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
       </button>
     </div>
   );

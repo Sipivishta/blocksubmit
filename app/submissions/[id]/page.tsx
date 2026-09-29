@@ -1,9 +1,3 @@
-// Submission details page: /submissions/[id]
-// Shared between students (own submission) and teachers (submissions to
-// their own assignments) — the rendered sections differ by role, but the
-// authorization check is identical to, and no more permissive than, the
-// one in the API routes (see the isOwner/isAssignmentTeacher/isAdmin
-// pattern in app/api/submissions/[id]/verify|retry|download/route.ts).
 export const runtime = 'nodejs';
 
 import { redirect, notFound } from 'next/navigation';
@@ -23,6 +17,18 @@ import { CopyButton } from '@/components/CopyButton';
 import { AppShell } from '@/components/AppShell';
 import { RETRYABLE_STATUSES } from '@/types';
 import type { Assignment, Grade, Submission } from '@/types';
+import { 
+  ArrowLeft, 
+  FileText, 
+  Hash, 
+  Cpu, 
+  HardDrive, 
+  ShieldCheck, 
+  Award, 
+  GitBranch, 
+  History,
+  Calendar
+} from 'lucide-react';
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -30,8 +36,13 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-400">{children}</h2>;
+function SectionHeader({ icon: Icon, title }: { icon: React.ComponentType<{ className?: string }>; title: string }) {
+  return (
+    <div className="flex items-center gap-2 mb-2.5">
+      <Icon className="h-4 w-4 text-brand-600 shrink-0" />
+      <h2 className="text-xs font-bold uppercase tracking-wider text-ink-500">{title}</h2>
+    </div>
+  );
 }
 
 export default async function SubmissionDetailsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -51,9 +62,6 @@ export default async function SubmissionDetailsPage({ params }: { params: Promis
     .eq('id', id)
     .single();
 
-  // A 404 here — never a 403 — for anything the RLS-scoped query can't
-  // see, so a student probing another student's submission ID learns
-  // nothing about whether it exists.
   if (!submission) notFound();
 
   const assignment = (submission as unknown as { assignments: Assignment }).assignments;
@@ -74,122 +82,142 @@ export default async function SubmissionDetailsPage({ params }: { params: Promis
   const canDownload = isOwner || isAssignmentTeacher || isAdmin;
 
   return (
-    <AppShell title="Submission">
-      <div className="mx-auto max-w-5xl p-4 sm:p-8">
-        <Link
-          href={isAssignmentTeacher || isAdmin ? `/teacher/assignments/${assignment.id}` : '/student'}
-          className="text-sm text-ink-400 hover:text-ink-900"
-        >
-          ← Back
-        </Link>
+    <AppShell title="Submission Evidence">
+      <div className="mx-auto max-w-5xl p-4 sm:p-8 space-y-6">
+        <div>
+          <Link
+            href={isAssignmentTeacher || isAdmin ? `/teacher/assignments/${assignment.id}` : '/student'}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink-500 hover:text-ink-900 transition-colors mb-3"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Back to {isAssignmentTeacher || isAdmin ? 'Assignment Submissions' : 'Dashboard'}</span>
+          </Link>
 
-        <div className="page-intro mt-3 flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="eyebrow">Submission evidence</p>
-            <h1 className="text-2xl font-semibold text-ink-900">{assignment.title}</h1>
-            <p className="mt-2 truncate font-mono text-xs text-ink-500">{s.file_name}</p>
-            <p className="mt-2 text-xs text-ink-400">Submitted {s.submitted_at ? new Date(s.submitted_at).toLocaleString() : 'not yet timestamped'}</p>
-          </div>
-          <StatusBadge status={s.status} />
-        </div>
-
-        <div className="mt-4">
-          <StateMachineStepper status={s.status} />
-        </div>
-
-        <div className="mt-6 space-y-6">
-          <div className="card-padded surface-grid space-y-3">
-            <SectionLabel>File</SectionLabel>
-            <dl className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <dt className="text-xs text-ink-400">Filename</dt>
-                <dd className="mt-0.5 text-ink-800">{s.file_name}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-ink-400">Size</dt>
-                <dd className="mt-0.5 text-ink-800">{formatBytes(s.file_size)}</dd>
-              </div>
-              <div className="col-span-2">
-                <dt className="text-xs text-ink-400">Submitted</dt>
-                <dd className="mt-0.5 text-ink-800">
-                  {s.submitted_at ? new Date(s.submitted_at).toLocaleString() : '—'}
-                </dd>
-              </div>
-            </dl>
-          </div>
-
-          {s.file_hash && (
-            <div className="card-padded space-y-2">
-              <SectionLabel>Cryptographic fingerprint</SectionLabel>
-              <p className="text-xs text-ink-400">SHA-256, computed server-side from the exact uploaded bytes</p>
-              <div className="flex items-center gap-2">
-                <code className="min-w-0 flex-1 break-all rounded-md border border-brand-100 bg-white px-3 py-2 font-mono text-xs leading-5 text-ink-700">
-                  {s.file_hash}
-                </code>
-                <CopyButton value={s.file_hash} />
+          <div className="page-intro flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="eyebrow">Cryptographic Evidence Dossier</p>
+              <h1 className="text-2xl font-bold tracking-tight text-ink-950 sm:text-3xl">{assignment.title}</h1>
+              <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-ink-500">
+                <span className="font-mono font-medium bg-ink-100/80 px-2 py-0.5 rounded text-ink-800">
+                  {s.file_name}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-3.5 w-3.5 text-ink-400" />
+                  Submitted: {s.submitted_at ? new Date(s.submitted_at).toLocaleString() : 'Pending'}
+                </span>
               </div>
             </div>
-          )}
+            <StatusBadge status={s.status} />
+          </div>
+        </div>
 
-          {(s.blockchain_tx_hash || s.blockchain_block_number != null) && (
-            <div className="card-padded space-y-3">
-              <SectionLabel>Blockchain proof</SectionLabel>
-              <p className="text-xs text-ink-400">Immutable record on the Sepolia network</p>
-              <dl className="space-y-3 text-sm">
-                {s.blockchain_tx_hash && (
-                  <div>
-                    <dt className="text-xs text-ink-400">Transaction</dt>
-                    <div className="mt-0.5 flex items-center gap-2">
-                      <code className="flex-1 truncate rounded bg-ink-50 px-2 py-1.5 font-mono text-xs text-ink-700">
-                        {s.blockchain_tx_hash}
-                      </code>
-                      <CopyButton value={s.blockchain_tx_hash} />
-                    </div>
-                  </div>
-                )}
-                <div className="flex gap-6">
-                  {s.blockchain_block_number != null && (
-                    <div>
-                      <dt className="text-xs text-ink-400">Block</dt>
-                      <dd className="mt-0.5 text-ink-800">{s.blockchain_block_number}</dd>
-                    </div>
-                  )}
-                  <div>
-                    <dt className="text-xs text-ink-400">Network</dt>
-                    <dd className="mt-0.5 text-ink-800">Sepolia</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-ink-400">State</dt>
-                    <dd className="mt-0.5">
-                      <StatusBadge status={s.status} />
-                    </dd>
-                  </div>
+        {/* State machine stepper */}
+        <StateMachineStepper status={s.status} />
+
+        <div className="space-y-6">
+          {/* File Card */}
+          <div>
+            <SectionHeader icon={FileText} title="File Metadata & Storage" />
+            <div className="card-padded surface-grid bg-white space-y-4">
+              <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wider text-ink-400">File Name</dt>
+                  <dd className="mt-1 font-semibold text-ink-900 truncate" title={s.file_name}>{s.file_name}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wider text-ink-400">Payload Size</dt>
+                  <dd className="mt-1 font-semibold text-ink-900">{formatBytes(s.file_size)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wider text-ink-400">Timestamp</dt>
+                  <dd className="mt-1 font-semibold text-ink-900">
+                    {s.submitted_at ? new Date(s.submitted_at).toLocaleString() : '—'}
+                  </dd>
                 </div>
               </dl>
+              <div className="border-t border-ink-100 pt-3 flex items-center justify-between gap-4">
+                <p className="text-xs text-ink-500">
+                  {s.file_path ? 'Encrypted file stored in R2. Access gated via short-lived presigned links.' : 'File pending upload.'}
+                </p>
+                {canDownload && <DownloadButton submissionId={s.id} mimeType={s.mime_type} />}
+              </div>
+            </div>
+          </div>
+
+          {/* Fingerprint Card */}
+          {s.file_hash && (
+            <div>
+              <SectionHeader icon={Hash} title="Cryptographic SHA-256 Fingerprint" />
+              <div className="card-padded bg-white space-y-2">
+                <p className="text-xs text-ink-500">
+                  Server-side computed hash representing the exact binary byte sequence stored in R2.
+                </p>
+                <div className="flex items-center gap-2">
+                  <code className="min-w-0 flex-1 break-all rounded-xl border border-brand-100 bg-brand-50/40 px-3.5 py-2.5 font-mono text-xs font-semibold text-brand-900">
+                    {s.file_hash}
+                  </code>
+                  <CopyButton value={s.file_hash} />
+                </div>
+              </div>
             </div>
           )}
 
-          <div className="card-padded space-y-3">
-            <SectionLabel>Storage</SectionLabel>
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-ink-600">
-                {s.file_path ? 'File stored, accessible only via a short-lived signed link.' : 'Not yet stored.'}
-              </p>
-              {canDownload && <DownloadButton submissionId={s.id} mimeType={s.mime_type} />}
+          {/* Blockchain Proof */}
+          {(s.blockchain_tx_hash || s.blockchain_block_number != null) && (
+            <div>
+              <SectionHeader icon={Cpu} title="Sepolia Blockchain Proof" />
+              <div className="card-padded bg-white space-y-4">
+                <p className="text-xs text-ink-500">
+                  Write-once smart contract transaction confirming fingerprint registration.
+                </p>
+                <dl className="grid gap-3 text-sm">
+                  {s.blockchain_tx_hash && (
+                    <div>
+                      <dt className="text-xs font-semibold uppercase tracking-wider text-ink-400">Transaction Hash</dt>
+                      <div className="mt-1 flex items-center gap-2">
+                        <code className="flex-1 truncate rounded-lg bg-ink-50 px-3 py-2 font-mono text-xs text-ink-800 border border-ink-200">
+                          {s.blockchain_tx_hash}
+                        </code>
+                        <CopyButton value={s.blockchain_tx_hash} />
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-6 pt-2 border-t border-ink-100">
+                    {s.blockchain_block_number != null && (
+                      <div>
+                        <dt className="text-xs font-semibold uppercase tracking-wider text-ink-400">Block Number</dt>
+                        <dd className="mt-0.5 text-sm font-bold text-ink-900">{s.blockchain_block_number}</dd>
+                      </div>
+                    )}
+                    <div>
+                      <dt className="text-xs font-semibold uppercase tracking-wider text-ink-400">Network</dt>
+                      <dd className="mt-0.5 text-sm font-bold text-brand-700">Sepolia Testnet</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-semibold uppercase tracking-wider text-ink-400">State Machine</dt>
+                      <dd className="mt-0.5">
+                        <StatusBadge status={s.status} showIcon={false} />
+                      </dd>
+                    </div>
+                  </div>
+                </dl>
+              </div>
             </div>
-          </div>
+          )}
 
           {canRetry && <RetryBlockchainButton submissionId={s.id} />}
 
+          {/* Live Integrity Card */}
           {s.status === 'CONFIRMED' && (
-            <div className="space-y-2">
-              <SectionLabel>Integrity verification</SectionLabel>
+            <div>
+              <SectionHeader icon={ShieldCheck} title="Live Integrity Verification" />
               <VerifyIntegrityCard submissionId={s.id} />
             </div>
           )}
 
-          <div className="space-y-2">
-            <SectionLabel>Grade</SectionLabel>
+          {/* Evaluation Grade */}
+          <div>
+            <SectionHeader icon={Award} title="Instructor Grade & Feedback" />
             {canGrade ? (
               <GradeForm submissionId={s.id} existingGrade={(grade as Grade | null) ?? null} />
             ) : (
@@ -197,18 +225,20 @@ export default async function SubmissionDetailsPage({ params }: { params: Promis
             )}
           </div>
 
+          {/* Similarity Scan */}
           {canGrade && (
-            <div className="space-y-2">
-              <SectionLabel>Similarity</SectionLabel>
-              <div className="card-padded">
+            <div>
+              <SectionHeader icon={GitBranch} title="Text Similarity Analysis" />
+              <div className="card-padded bg-white">
                 <SimilarityCard submissionId={s.id} />
               </div>
             </div>
           )}
 
-          <div className="space-y-2">
-            <SectionLabel>Timeline</SectionLabel>
-            <div className="card-padded">
+          {/* Audit Timeline */}
+          <div>
+            <SectionHeader icon={History} title="Immutable Audit Trail" />
+            <div className="card-padded bg-white">
               <AuditTimeline submissionId={s.id} />
             </div>
           </div>

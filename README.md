@@ -130,13 +130,13 @@ erDiagram
     ASSIGNMENTS ||--o{ SUBMISSION_SIMILARITY_MATCHES : contains
     SUBMISSIONS ||--o{ SUBMISSION_SIMILARITY_MATCHES : pair_a
     SUBMISSIONS ||--o{ SUBMISSION_SIMILARITY_MATCHES : pair_b
-    PROFILES { uuid id PK; string role; string full_name }
-    ASSIGNMENTS { uuid id PK; uuid teacher_id FK; string title; datetime deadline }
-    SUBMISSIONS { uuid id PK; uuid assignment_id FK; uuid student_id FK; string status; string file_hash }
-    GRADES { uuid id PK; uuid submission_id FK; uuid teacher_id FK; decimal marks }
-    TEACHER_STUDENT_LINKS { uuid id PK; uuid teacher_id FK; uuid student_id FK }
-    AUDIT_LOGS { uuid id PK; uuid user_id FK; string action; uuid resource_id }
-    SUBMISSION_SIMILARITY_MATCHES { uuid id PK; uuid assignment_id FK; uuid submission_id_a FK; uuid submission_id_b FK; decimal similarity_score }
+    PROFILES { uuid id PK }
+    ASSIGNMENTS { uuid id PK }
+    SUBMISSIONS { uuid id PK }
+    GRADES { uuid id PK }
+    TEACHER_STUDENT_LINKS { uuid id PK }
+    AUDIT_LOGS { uuid id PK }
+    SUBMISSION_SIMILARITY_MATCHES { uuid id PK }
 ```
 Migrations enable RLS: students access their records, teachers access owned assignments, admins have broader access, and similarity rows are not student-readable. Server code controls submission state, hashes, and blockchain fields.
 ## 10. API Overview

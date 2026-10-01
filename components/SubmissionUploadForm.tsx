@@ -1,16 +1,11 @@
 'use client';
 
-// Student-facing upload form driving the create-submission API call and
-// reflecting each state-machine step back to the user as it happens.
-// Drag-and-drop is a UI convenience over the same <input type="file">
-// selection path — both end up calling the identical validate+setFile
-// logic, and the actual submit is still the one real POST request it
-// always was (no fabricated multi-step progress: "Submitting…" reflects
-// that one request being in flight, and the badge shown afterward is the
-// real final status the server returned).
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { UploadCloud, FileText, CheckCircle2, AlertCircle, X, ArrowRight, Loader2 } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
+import { useToast } from './ToastProvider';
+import Link from 'next/link';
 import type { Submission } from '@/types';
 
 const MAX_SIZE_BYTES = 20 * 1024 * 1024;
@@ -26,12 +21,15 @@ export function SubmissionUploadForm({ assignmentId }: { assignmentId: string })
   const [result, setResult] = useState<Submission | null>(null);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const toast = useToast();
 
   function validateAndSetFile(selected: File | null) {
     setError(null);
     if (selected) {
       if (selected.size > MAX_SIZE_BYTES) {
-        setError('File exceeds the 20MB limit.');
+        const msg = 'File exceeds the 20MB limit.';
+        setError(msg);
+        toast.error('File size error', msg);
         setFile(null);
         return;
       }
@@ -61,74 +59,140 @@ export function SubmissionUploadForm({ assignmentId }: { assignmentId: string })
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error ?? 'Submission failed');
+        const msg = data.error ?? 'Submission failed';
+        setError(msg);
+        toast.error('Submission failed', msg);
         return;
       }
       setResult(data.submission);
+      toast.success('File submitted successfully!', 'Fingerprint calculation and proof recording started.');
       router.refresh();
     } catch {
-      setError('Network error — please try again');
+      const msg = 'Network error — please try again';
+      setError(msg);
+      toast.error('Network error', 'Failed to connect to server');
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card-padded space-y-4">
-      <div>
-        <label className="text-sm font-semibold text-ink-900">Upload your file</label>
-        <p className="mt-0.5 text-xs text-ink-400">PDF, DOCX, PPTX, or ZIP — up to 20MB</p>
+    <div className="card-padded bg-white shadow-card border border-ink-200/80">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-sm font-semibold text-ink-900">Upload your work</label>
+            <span className="text-xs font-medium text-ink-500">Max file size: 20MB</span>
+          </div>
+          <p className="text-xs text-ink-500">Accepted formats: PDF, DOCX, PPTX, ZIP</p>
 
-        <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragActive(true);
-          }}
-          onDragLeave={() => setDragActive(false)}
-          onDrop={handleDrop}
-          className={`surface-grid relative mt-3 flex min-h-44 flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-8 text-center transition-all ${
-            dragActive ? 'border-brand-400 bg-brand-50 shadow-lift' : file ? 'border-emerald-300 bg-emerald-50/40' : 'border-ink-200 hover:border-brand-300 hover:bg-brand-50/40'
-          }`}
-        >
-          <input
-            type="file"
-            accept=".pdf,.docx,.pptx,.zip"
-            onChange={(e) => validateAndSetFile(e.target.files?.[0] ?? null)}
-            className="absolute inset-0 cursor-pointer opacity-0"
-            aria-label="Choose a file to upload"
-          />
-          {file ? (
-            <>
-              <svg viewBox="0 0 20 20" fill="none" className="h-6 w-6 text-brand-600">
-                <path d="M4 3h8l4 4v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" stroke="currentColor" strokeWidth="1.4" />
-              </svg>
-              <p className="mt-2 text-sm font-medium text-ink-800">{file.name}</p>
-              <p className="text-xs text-ink-400">{formatBytes(file.size)}</p>
-            </>
-          ) : (
-            <>
-              <svg viewBox="0 0 20 20" fill="none" className="h-6 w-6 text-ink-300">
-                <path d="M10 3v10m0-10 3.5 3.5M10 3 6.5 6.5M4 14v2a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <p className="mt-2 text-sm font-medium text-ink-600">Drag a file here, or click to browse</p>
-            </>
-          )}
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragActive(true);
+            }}
+            onDragLeave={() => setDragActive(false)}
+            onDrop={handleDrop}
+            className={`surface-grid relative mt-3 flex min-h-[160px] flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-6 text-center transition-all ${
+              dragActive
+                ? 'border-brand-500 bg-brand-50/80 shadow-lift scale-[1.01]'
+                : file
+                ? 'border-emerald-400 bg-emerald-50/40'
+                : 'border-ink-200 hover:border-brand-400 hover:bg-brand-50/30'
+            }`}
+          >
+            <input
+              type="file"
+              accept=".pdf,.docx,.pptx,.zip"
+              onChange={(e) => validateAndSetFile(e.target.files?.[0] ?? null)}
+              className="absolute inset-0 cursor-pointer opacity-0 z-10"
+              aria-label="Choose a file to upload"
+            />
+            {file ? (
+              <div className="flex items-center justify-between w-full max-w-md bg-white p-3 rounded-lg border border-emerald-200 shadow-sm z-20">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2 rounded-lg bg-emerald-100 text-emerald-700 shrink-0">
+                    <FileText className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 text-left">
+                    <p className="text-sm font-semibold text-ink-900 truncate">{file.name}</p>
+                    <p className="text-xs text-ink-500">{formatBytes(file.size)}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFile(null);
+                  }}
+                  className="p-1 rounded-md text-ink-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                  title="Remove file"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2 pointer-events-none">
+                <div className="p-3 rounded-2xl bg-brand-50 text-brand-600 shadow-sm border border-brand-100">
+                  <UploadCloud className="h-6 w-6 stroke-[1.8]" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-ink-800">
+                    <span className="text-brand-600 hover:underline">Click to browse</span> or drag & drop file
+                  </p>
+                  <p className="text-xs text-ink-400 mt-0.5">SHA-256 fingerprint will be recorded on submission</p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
 
-      <button type="submit" disabled={!file || submitting} className="btn-primary">
-        {submitting && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />}
-        {submitting ? 'Submitting…' : 'Submit'}
-      </button>
+        {file && !result && (
+          <button
+            type="submit"
+            disabled={submitting}
+            className="btn-primary w-full py-2.5 shadow-sm active:scale-[0.99] transition-all"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin text-white" />
+                <span>Uploading & hashing file...</span>
+              </>
+            ) : (
+              <>
+                <UploadCloud className="h-4 w-4" />
+                <span>Submit File for Verification</span>
+              </>
+            )}
+          </button>
+        )}
 
-      {error && <p role="alert" aria-live="polite" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+        {error && (
+          <div role="alert" className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
 
-      {result && (
-        <div aria-live="polite" className="flex items-center justify-between rounded-md border border-emerald-200 bg-emerald-50 p-3">
-          <span className="text-sm text-ink-700">{result.file_name}</span>
-          <StatusBadge status={result.status} />
-        </div>
-      )}
-    </form>
+        {result && (
+          <div aria-live="polite" className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+                <span className="text-sm font-semibold text-emerald-900 truncate">{result.file_name}</span>
+              </div>
+              <StatusBadge status={result.status} />
+            </div>
+            <Link
+              href={`/submissions/${result.id}`}
+              className="btn-primary w-full py-2 text-xs bg-emerald-700 hover:bg-emerald-800 border-none shadow-sm"
+            >
+              <span>View Immutable Submission Proof</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        )}
+      </form>
+    </div>
   );
 }

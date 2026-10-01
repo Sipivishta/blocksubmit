@@ -1,8 +1,3 @@
-// Admin teacher detail: /admin/teachers/[id]
-// Shows one teacher's profile and every assignment they own — again, a
-// plain query against the existing schema (assignments.teacher_id), which
-// is already the complete and correct definition of "this teacher's
-// assignments" everywhere else in the app.
 export const runtime = 'nodejs';
 
 import { redirect, notFound } from 'next/navigation';
@@ -13,6 +8,7 @@ import { AppShell } from '@/components/AppShell';
 import { EmptyState } from '@/components/EmptyState';
 import { dashboardPathForRole } from '@/lib/redirect-for-role';
 import type { Assignment, Profile } from '@/types';
+import { ArrowLeft, UserCheck, Calendar, ArrowRight } from 'lucide-react';
 
 export default async function AdminTeacherDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -41,29 +37,58 @@ export default async function AdminTeacherDetailPage({ params }: { params: Promi
     .order('deadline', { ascending: true });
 
   const t = teacher as Profile;
+  const assignmentList = (assignments ?? []) as Assignment[];
 
   return (
-    <AppShell title="Teacher">
-      <div className="mx-auto max-w-2xl p-4 sm:p-6">
-        <Link href="/admin/teachers" className="text-sm text-ink-400 hover:text-ink-900">
-          ← Teachers
-        </Link>
-        <h1 className="mt-1 text-2xl font-semibold text-ink-900">{t.full_name}</h1>
-        {t.department && <p className="mt-1 text-sm text-ink-400">{t.department}</p>}
+    <AppShell title="Teacher Profile">
+      <div className="mx-auto max-w-4xl p-4 sm:p-8 space-y-6">
+        <div>
+          <Link
+            href="/admin/teachers"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink-500 hover:text-ink-900 transition-colors mb-3"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Back to Teachers Directory</span>
+          </Link>
 
-        <h2 className="mt-6 text-xs font-semibold uppercase tracking-wide text-ink-400">Assignments</h2>
-        <div className="mt-2 space-y-2">
-          {((assignments ?? []) as Assignment[]).length === 0 ? (
-            <EmptyState title="No assignments" description="This teacher hasn't created any assignments yet." />
+          <div className="page-intro flex items-center gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-600 text-lg font-bold text-white shadow-lift">
+              {t.full_name[0]?.toUpperCase()}
+            </div>
+            <div>
+              <p className="eyebrow text-violet-600">Instructor Account</p>
+              <h1 className="text-2xl font-bold tracking-tight text-ink-950 sm:text-3xl">{t.full_name}</h1>
+              {t.department && <p className="text-xs text-ink-500 mt-0.5">{t.department}</p>}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-ink-400">Owned Assignments ({assignmentList.length})</h2>
+
+          {assignmentList.length === 0 ? (
+            <EmptyState title="No assignments created" description="This teacher hasn't created any course assignments yet." />
           ) : (
-            ((assignments ?? []) as Assignment[]).map((a) => (
+            assignmentList.map((a) => (
               <Link
                 key={a.id}
                 href={`/teacher/assignments/${a.id}`}
-                className="flex items-center justify-between rounded-lg border border-ink-200 bg-white px-4 py-3 hover:border-ink-300"
+                className="card flex items-center justify-between px-5 py-4 hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-lift transition-all bg-white group"
               >
-                <span className="text-sm font-medium text-ink-900">{a.title}</span>
-                <span className="text-xs text-ink-400">{new Date(a.deadline).toLocaleDateString()}</span>
+                <div className="space-y-1 min-w-0">
+                  <p className="text-sm font-bold text-ink-950 group-hover:text-brand-600 transition-colors truncate">
+                    {a.title}
+                  </p>
+                  <div className="flex items-center gap-1.5 text-xs text-ink-400">
+                    <Calendar className="h-3.5 w-3.5" />
+                    <span>Deadline: {new Date(a.deadline).toLocaleDateString()}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 text-xs font-semibold text-brand-600">
+                  <span>View Submissions</span>
+                  <ArrowRight className="h-4 w-4" />
+                </div>
               </Link>
             ))
           )}

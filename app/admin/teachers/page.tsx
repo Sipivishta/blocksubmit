@@ -1,9 +1,3 @@
-// Admin teacher list: /admin/teachers
-// Read-only listing of every TEACHER profile with their assignment count
-// — plain queries against the existing schema (profiles.role, assignments
-// grouped by teacher_id). No mapping table, no new schema: a teacher's
-// "assignments" already are the complete, correct picture of what they
-// own, exactly as every other page in this app already treats it.
 export const runtime = 'nodejs';
 
 import { redirect } from 'next/navigation';
@@ -15,6 +9,7 @@ import { CreateTeacherForm } from '@/components/CreateTeacherForm';
 import { EmptyState } from '@/components/EmptyState';
 import { dashboardPathForRole } from '@/lib/redirect-for-role';
 import type { Profile } from '@/types';
+import { ArrowLeft, UserCheck, ArrowRight } from 'lucide-react';
 
 export default async function AdminTeachersPage() {
   try {
@@ -32,7 +27,8 @@ export default async function AdminTeachersPage() {
     .eq('role', 'TEACHER')
     .order('full_name', { ascending: true });
 
-  const teacherIds = ((teachers ?? []) as Profile[]).map((t) => t.id);
+  const teacherList = (teachers ?? []) as Profile[];
+  const teacherIds = teacherList.map((t) => t.id);
   const { data: assignments } = teacherIds.length
     ? await supabase.from('assignments').select('teacher_id').in('teacher_id', teacherIds)
     : { data: [] as { teacher_id: string }[] };
@@ -41,30 +37,54 @@ export default async function AdminTeachersPage() {
   for (const a of assignments ?? []) countByTeacher.set(a.teacher_id, (countByTeacher.get(a.teacher_id) ?? 0) + 1);
 
   return (
-    <AppShell title="Teachers">
-      <div className="mx-auto max-w-3xl p-4 sm:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <Link href="/admin" className="text-sm text-ink-400 hover:text-ink-900">
-              ← Admin
-            </Link>
-            <h1 className="mt-1 text-2xl font-semibold text-ink-900">Teachers</h1>
+    <AppShell title="Instructors Directory">
+      <div className="mx-auto max-w-4xl p-4 sm:p-8 space-y-6">
+        <div>
+          <Link
+            href="/admin"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink-500 hover:text-ink-900 transition-colors mb-3"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Back to System Overview</span>
+          </Link>
+
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-ink-950 sm:text-3xl">Teacher Accounts</h1>
+              <p className="mt-1 text-xs text-ink-500">Manage instructor profiles and inspect owned course assignments.</p>
+            </div>
+            <CreateTeacherForm />
           </div>
-          <CreateTeacherForm />
         </div>
 
-        <div className="mt-6 space-y-2">
-          {((teachers ?? []) as Profile[]).length === 0 ? (
-            <EmptyState title="No teacher accounts yet" description="Use the button above to add one." />
+        <div className="space-y-3">
+          {teacherList.length === 0 ? (
+            <EmptyState title="No teacher accounts found" description="Provision instructor profiles using the button above." />
           ) : (
-            ((teachers ?? []) as Profile[]).map((teacher) => (
+            teacherList.map((teacher) => (
               <Link
                 key={teacher.id}
                 href={`/admin/teachers/${teacher.id}`}
-                className="card flex items-center justify-between px-4 py-4 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-lift"
+                className="card flex items-center justify-between px-5 py-4 hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-lift transition-all bg-white group"
               >
-                <span className="flex min-w-0 items-center gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-50 text-xs font-bold text-brand-700">{teacher.full_name.slice(0, 1).toUpperCase()}</span><span className="truncate text-sm font-semibold text-ink-900">{teacher.full_name}</span></span>
-                <span className="text-xs text-ink-400">{countByTeacher.get(teacher.id) ?? 0} assignments</span>
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-sm font-bold text-violet-800 shadow-sm">
+                    {teacher.full_name.slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-ink-950 group-hover:text-brand-600 transition-colors">
+                      {teacher.full_name}
+                    </p>
+                    {teacher.department && <p className="text-xs text-ink-400">{teacher.department}</p>}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <span className="rounded-full bg-ink-50 border border-ink-200 px-3 py-1 text-xs font-semibold text-ink-700">
+                    {countByTeacher.get(teacher.id) ?? 0} Assignments
+                  </span>
+                  <ArrowRight className="h-4 w-4 text-ink-400 group-hover:text-brand-600 transition-colors" />
+                </div>
               </Link>
             ))
           )}

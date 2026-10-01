@@ -1,17 +1,3 @@
-// Admin page: /admin — system-level counts plus links into teacher,
-// student, and relationship management. RLS already grants admins full
-// read access to every table; this page and its sub-pages
-// (/admin/teachers, /admin/students, /admin/relationships) surface that
-// access as listing/detail/management views over the schema.
-//
-// A submission's responsible teacher is still derived via
-// assignment_id -> assignments.teacher_id, exactly as before — that part
-// of the model is unchanged. teacher_student_links
-// (supabase/migrations/0006_teacher_student_links.sql) adds a separate,
-// admin-controlled layer on top of that: which teachers a student is
-// even allowed to see assignments from and submit work to in the first
-// place. It doesn't replace the assignment-ownership model; it gates
-// access to it.
 export const runtime = 'nodejs';
 
 import { redirect } from 'next/navigation';
@@ -19,7 +5,9 @@ import Link from 'next/link';
 import { requireRole, UnauthorizedError, ForbiddenError } from '@/lib/auth';
 import { createServerClient } from '@/lib/supabase-server';
 import { AppShell } from '@/components/AppShell';
+import { StatCard } from '@/components/StatCard';
 import { dashboardPathForRole } from '@/lib/redirect-for-role';
+import { Shield, UserCheck, Users, GitFork, ArrowRight, Activity } from 'lucide-react';
 
 export default async function AdminPage() {
   let admin;
@@ -49,44 +37,85 @@ export default async function AdminPage() {
   ]);
 
   const stats = [
-    { label: 'Teachers', value: teacherCount ?? 0 },
-    { label: 'Students', value: studentCount ?? 0 },
-    { label: 'Relationships', value: linkCount ?? 0 },
-    { label: 'Assignments', value: assignmentCount ?? 0 },
-    { label: 'Submissions', value: submissionCount ?? 0 },
-    { label: 'Confirmed on-chain', value: confirmedCount ?? 0 }
+    { label: 'Teachers', value: teacherCount ?? 0, subtext: 'Enrolled instructors' },
+    { label: 'Students', value: studentCount ?? 0, subtext: 'Registered students' },
+    { label: 'Relationships', value: linkCount ?? 0, subtext: 'Active teacher-student links' },
+    { label: 'Assignments', value: assignmentCount ?? 0, subtext: 'Active course assignments' },
+    { label: 'Submissions', value: submissionCount ?? 0, subtext: 'Total files processed' },
+    { label: 'Confirmed on-chain', value: confirmedCount ?? 0, subtext: 'Sepolia proofs sealed' }
   ];
 
   return (
-    <AppShell title="Dashboard">
-      <div className="mx-auto max-w-5xl p-4 sm:p-8">
-        <div className="page-intro">
-          <p className="eyebrow">System administration</p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-ink-900 sm:text-3xl">Platform overview</h1>
-          <p className="mt-2 text-sm text-ink-500">Signed in as {admin.full_name}. Keep the academic integrity network healthy.</p>
+    <AppShell title="System Overview">
+      <div className="mx-auto max-w-5xl p-4 sm:p-8 space-y-8">
+        <div className="page-intro relative overflow-hidden">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-2xl bg-emerald-600 text-white shadow-lift">
+              <Shield className="h-6 w-6 stroke-[2]" />
+            </div>
+            <div>
+              <p className="eyebrow text-emerald-600">Platform Administration</p>
+              <h1 className="text-2xl font-bold tracking-tight text-ink-950 sm:text-3xl">System Overview</h1>
+            </div>
+          </div>
+          <p className="mt-3 text-sm text-ink-600 max-w-xl leading-relaxed">
+            Signed in as <span className="font-semibold text-ink-900">{admin.full_name}</span>. Monitor system health, provision teacher accounts, and manage student enrollment access.
+          </p>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {stats.map((stat) => (
-            <div key={stat.label} className="card-padded">
-              <p className="text-xs font-medium text-ink-400">{stat.label}</p>
-              <p className="mt-1 text-2xl font-semibold text-ink-900">{stat.value}</p>
-            </div>
+            <StatCard key={stat.label} label={stat.label} value={stat.value} subtext={stat.subtext} />
           ))}
         </div>
 
-        <div className="mt-6 grid gap-3 sm:grid-cols-3">
-          <Link href="/admin/teachers" className="card-padded block hover:border-ink-300">
-            <p className="text-sm font-medium text-ink-900">Manage teachers →</p>
-            <p className="mt-1 text-xs text-ink-400">View teachers and the assignments they own, add new accounts</p>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Link
+            href="/admin/teachers"
+            className="card-padded bg-white hover:border-brand-200 hover:shadow-lift transition-all space-y-2 group"
+          >
+            <div className="p-2.5 rounded-xl bg-violet-50 text-violet-700 w-fit">
+              <UserCheck className="h-5 w-5" />
+            </div>
+            <h3 className="text-base font-bold text-ink-900 flex items-center justify-between group-hover:text-brand-600">
+              <span>Manage Teachers</span>
+              <ArrowRight className="h-4 w-4" />
+            </h3>
+            <p className="text-xs text-ink-500 leading-relaxed">
+              Provision teacher accounts, inspect owned assignments, and handle role promotions.
+            </p>
           </Link>
-          <Link href="/admin/students" className="card-padded block hover:border-ink-300">
-            <p className="text-sm font-medium text-ink-900">Manage students →</p>
-            <p className="mt-1 text-xs text-ink-400">View students and their submission history</p>
+
+          <Link
+            href="/admin/students"
+            className="card-padded bg-white hover:border-brand-200 hover:shadow-lift transition-all space-y-2 group"
+          >
+            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-700 w-fit">
+              <Users className="h-5 w-5" />
+            </div>
+            <h3 className="text-base font-bold text-ink-900 flex items-center justify-between group-hover:text-brand-600">
+              <span>Manage Students</span>
+              <ArrowRight className="h-4 w-4" />
+            </h3>
+            <p className="text-xs text-ink-500 leading-relaxed">
+              Inspect student accounts, view submission histories, and manage student role statuses.
+            </p>
           </Link>
-          <Link href="/admin/relationships" className="card-padded block hover:border-ink-300">
-            <p className="text-sm font-medium text-ink-900">Manage relationships →</p>
-            <p className="mt-1 text-xs text-ink-400">Control which teachers a student can see and submit to</p>
+
+          <Link
+            href="/admin/relationships"
+            className="card-padded bg-white hover:border-brand-200 hover:shadow-lift transition-all space-y-2 group"
+          >
+            <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-700 w-fit">
+              <GitFork className="h-5 w-5" />
+            </div>
+            <h3 className="text-base font-bold text-ink-900 flex items-center justify-between group-hover:text-brand-600">
+              <span>Manage Relationships</span>
+              <ArrowRight className="h-4 w-4" />
+            </h3>
+            <p className="text-xs text-ink-500 leading-relaxed">
+              Control student-teacher enrollment pairings and submission visibility permissions.
+            </p>
           </Link>
         </div>
       </div>

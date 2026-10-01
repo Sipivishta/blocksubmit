@@ -1,17 +1,8 @@
 'use client';
 
-// Calls the existing presigned-download endpoint and opens the returned
-// short-lived URL. Never constructs or stores an R2 URL itself — every
-// click gets a fresh URL, generated only after the backend's authorization
-// check on GET /api/submissions/[id]/download.
-//
-// Two distinct actions: "View document" requests mode=view (renders
-// inline in a new tab for formats the browser can actually display —
-// currently PDF only), "Download file" always requests a real download.
-// Whether "View" is offered at all is driven by the server's own
-// `viewable` response (based on the submission's server-detected
-// mime_type), not guessed client-side from the filename.
 import { useState } from 'react';
+import { Download, Eye, Loader2 } from 'lucide-react';
+import { useToast } from './ToastProvider';
 
 const INLINE_VIEWABLE_MIME_TYPES = new Set(['application/pdf']);
 
@@ -26,6 +17,7 @@ async function requestUrl(submissionId: string, mode: 'view' | 'download') {
 export function DownloadButton({ submissionId, mimeType }: { submissionId: string; mimeType?: string }) {
   const [loading, setLoading] = useState<'view' | 'download' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
   const canView = mimeType ? INLINE_VIEWABLE_MIME_TYPES.has(mimeType) : false;
 
   async function handle(mode: 'view' | 'download') {
@@ -34,8 +26,11 @@ export function DownloadButton({ submissionId, mimeType }: { submissionId: strin
     try {
       const { url } = await requestUrl(submissionId, mode);
       window.open(url, '_blank', 'noopener,noreferrer');
+      toast.info(mode === 'view' ? 'Opening document preview...' : 'Generating secure download link...');
     } catch {
-      setError('Network error — please try again');
+      const msg = 'Network error — please try again';
+      setError(msg);
+      toast.error('Download error', msg);
     } finally {
       setLoading(null);
     }
@@ -45,31 +40,36 @@ export function DownloadButton({ submissionId, mimeType }: { submissionId: strin
     <div>
       <div className="flex flex-wrap gap-2">
         {canView && (
-          <button onClick={() => handle('view')} disabled={loading !== null} className="btn-secondary">
-            <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5">
-              <path
-                d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8Z"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <circle cx="8" cy="8" r="1.75" stroke="currentColor" strokeWidth="1.4" />
-            </svg>
-            {loading === 'view' ? 'Opening…' : 'View document'}
+          <button
+            onClick={() => handle('view')}
+            disabled={loading !== null}
+            className="btn-secondary py-2 px-3 text-xs gap-1.5 active:scale-[0.98] transition-all"
+          >
+            {loading === 'view' ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-ink-600" />
+            ) : (
+              <Eye className="h-3.5 w-3.5 text-ink-600" />
+            )}
+            <span>{loading === 'view' ? 'Opening...' : 'View Document'}</span>
           </button>
         )}
-        <button onClick={() => handle('download')} disabled={loading !== null} className="btn-secondary">
-          <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5">
-            <path d="M8 2v8m0 0 3-3M8 10 5 7M3 13h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          {loading === 'download' ? 'Generating link…' : 'Download file'}
+        <button
+          onClick={() => handle('download')}
+          disabled={loading !== null}
+          className="btn-secondary py-2 px-3 text-xs gap-1.5 active:scale-[0.98] transition-all"
+        >
+          {loading === 'download' ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-brand-600" />
+          ) : (
+            <Download className="h-3.5 w-3.5 text-brand-600" />
+          )}
+          <span>{loading === 'download' ? 'Generating...' : 'Download File'}</span>
         </button>
       </div>
       {!canView && mimeType && (
-        <p className="mt-1.5 text-xs text-ink-400">Browser preview is unavailable for this file type.</p>
+        <p className="mt-1 text-[11px] text-ink-400">Inline browser view not supported for this file type.</p>
       )}
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-1 text-xs text-red-600 font-medium">{error}</p>}
     </div>
   );
 }

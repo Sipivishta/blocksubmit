@@ -1,11 +1,9 @@
 'use client';
 
-// Teacher-facing grading form, posting to the existing POST /api/grades
-// route (upsert). Client-side range check is for usability; the server is
-// the final authority (zod schema in app/api/grades/route.ts) and also
-// re-checks that the caller actually owns the assignment.
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Award, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { useToast } from './ToastProvider';
 import type { Grade } from '@/types';
 
 export function GradeForm({ submissionId, existingGrade }: { submissionId: string; existingGrade: Grade | null }) {
@@ -15,6 +13,7 @@ export function GradeForm({ submissionId, existingGrade }: { submissionId: strin
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const router = useRouter();
+  const toast = useToast();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -23,7 +22,9 @@ export function GradeForm({ submissionId, existingGrade }: { submissionId: strin
 
     const marksNum = Number(marks);
     if (marks === '' || Number.isNaN(marksNum) || marksNum < 0 || marksNum > 100) {
-      setError('Marks must be a number between 0 and 100');
+      const msg = 'Marks must be a number between 0 and 100';
+      setError(msg);
+      toast.error('Invalid mark input', msg);
       return;
     }
 
@@ -36,55 +37,92 @@ export function GradeForm({ submissionId, existingGrade }: { submissionId: strin
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(typeof data.error === 'string' ? data.error : 'Could not save grade');
+        const msg = typeof data.error === 'string' ? data.error : 'Could not save grade';
+        setError(msg);
+        toast.error('Grading failed', msg);
         return;
       }
       setSuccess(true);
+      toast.success('Grade recorded successfully', `Marks: ${marksNum}/100`);
       router.refresh();
     } catch {
-      setError('Network error — please try again');
+      const msg = 'Network error — please try again';
+      setError(msg);
+      toast.error('Network error', msg);
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card-padded space-y-3">
-      <h2 className="text-sm font-semibold text-ink-900">{existingGrade ? 'Update grade' : 'Grade this submission'}</h2>
-      <div>
-        <label className="label">Marks (0–100)</label>
-        <input
-          type="number"
-          min={0}
-          max={100}
-          step="0.5"
-          value={marks}
-          onChange={(e) => setMarks(e.target.value)}
-          className="input mt-1 w-32"
-        />
-      </div>
-      <div>
-        <label className="label">Feedback (optional)</label>
-        <textarea
-          value={feedback}
-          onChange={(e) => setFeedback(e.target.value)}
-          maxLength={5000}
-          rows={3}
-          className="input mt-1"
-        />
+    <form onSubmit={handleSubmit} className="card-padded bg-white space-y-4 shadow-card">
+      <div className="flex items-center gap-2 border-b border-ink-100 pb-3">
+        <Award className="h-5 w-5 text-brand-600" />
+        <h3 className="text-sm font-semibold text-ink-900">
+          {existingGrade ? 'Update Grade & Feedback' : 'Grade Submission'}
+        </h3>
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      {success && (
-        <p className="flex items-center gap-1.5 text-sm text-emerald-600">
-          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100 text-[10px]">✓</span>
-          Grade saved.
-        </p>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="sm:col-span-1">
+          <label className="label mb-1" htmlFor="marks-input">Marks (0 – 100)</label>
+          <div className="relative flex items-center">
+            <input
+              id="marks-input"
+              type="number"
+              min={0}
+              max={100}
+              step="0.5"
+              placeholder="e.g. 92.5"
+              value={marks}
+              onChange={(e) => setMarks(e.target.value)}
+              className="input text-base font-bold pr-12"
+            />
+            <span className="absolute right-3 text-xs font-semibold text-ink-400">/ 100</span>
+          </div>
+        </div>
+
+        <div className="sm:col-span-2">
+          <label className="label mb-1">Feedback Notes</label>
+          <textarea
+            placeholder="Write constructive feedback for the student..."
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            maxLength={5000}
+            rows={2}
+            className="input text-sm"
+          />
+        </div>
+      </div>
+
+      {error && (
+        <div role="alert" className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-700">
+          <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+          <span>{error}</span>
+        </div>
       )}
 
-      <button type="submit" disabled={submitting} className="btn-primary">
-        {submitting ? 'Saving…' : existingGrade ? 'Update grade' : 'Submit grade'}
-      </button>
+      {success && (
+        <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 text-xs text-emerald-800">
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+          <span>Grade saved successfully and updated in student record.</span>
+        </div>
+      )}
+
+      <div className="flex justify-end">
+        <button type="submit" disabled={submitting} className="btn-primary py-2 px-5 text-xs">
+          {submitting ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+              <span>Saving Grade...</span>
+            </>
+          ) : existingGrade ? (
+            'Update Grade'
+          ) : (
+            'Submit Grade'
+          )}
+        </button>
+      </div>
     </form>
   );
 }

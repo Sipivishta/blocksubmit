@@ -1,21 +1,3 @@
-// Registration page — uses Supabase Auth's signUp() directly; no custom
-// authentication. New accounts are always created with role STUDENT (set
-// in user_metadata and mirrored into profiles by the handle_new_user()
-// trigger — see supabase/migrations/0001_init.sql). There is deliberately
-// no role selector here: a frontend control can never grant TEACHER/ADMIN,
-// since the trigger hardcodes STUDENT unless metadata says otherwise, and
-// even if a client crafted a raw signUp() call with role=TEACHER in
-// metadata, prevent_role_self_escalation() blocks any later role change
-// that doesn't come from the service role or an acting admin — promotion
-// only happens through trusted backend/database administration.
-//
-// Whether the user gets a session immediately or has to confirm their
-// email first is controlled by the Supabase project's own "Confirm email"
-// setting (Authentication → Providers → Email), not by this code — see
-// README "Email confirmation (dev vs. production)". This page handles
-// both outcomes: if signUp() returns a session, the user is already
-// logged in and we redirect immediately; if it doesn't, we show the
-// check-your-email state.
 'use client';
 
 import { useState } from 'react';
@@ -26,6 +8,7 @@ import { dashboardPathForRole } from '@/lib/redirect-for-role';
 import { friendlyAuthError } from '@/lib/auth-errors';
 import { PasswordInput } from '@/components/PasswordInput';
 import { PublicHeader } from '@/components/PublicHeader';
+import { Shield, User, Mail, AlertCircle, Loader2, UserPlus, ArrowLeft, CheckCircle2 } from 'lucide-react';
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -58,7 +41,6 @@ export default function RegisterPage() {
 
     setSubmitting(true);
     const supabase = createBrowserSupabaseClient();
-    // role is intentionally always STUDENT — see file header note.
     const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
@@ -72,122 +54,151 @@ export default function RegisterPage() {
     }
 
     if (data.session) {
-      // Email confirmation is off for this Supabase project (dev/demo
-      // configuration) — signUp() already returned an active session.
       router.push(dashboardPathForRole('STUDENT'));
       router.refresh();
       return;
     }
 
-    // Email confirmation is on (production configuration) — no session
-    // yet; the user must confirm before they can log in.
     setDone(true);
     setSubmitting(false);
   }
 
   if (done) {
     return (
-      <>
+      <div className="min-h-screen bg-ink-50 flex flex-col">
         <PublicHeader minimal />
-        <main className="auth-page px-4 py-14 text-center sm:py-20">
-          <div className="relative mx-auto max-w-sm">
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-7 shadow-card">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-600 text-xl font-bold text-white">✓</div>
-            <p className="mt-4 text-base font-semibold text-emerald-800">Account created</p>
-            <p className="mt-1 text-sm text-emerald-700">
-              Check your email to confirm your account, then log in.
-            </p>
-          </div>
-          <Link href="/login" className="mt-4 text-sm font-medium text-ink-900 underline">
-            Go to login
-          </Link>
+        <main className="auth-page flex-1 flex items-center justify-center px-4 py-14 text-center sm:py-20">
+          <div className="relative w-full max-w-md">
+            <div className="rounded-2xl border border-emerald-200 bg-white p-8 shadow-popover text-center space-y-4">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
+                <CheckCircle2 className="h-8 w-8" />
+              </div>
+              <h2 className="text-xl font-bold text-ink-900">Account Created Successfully</h2>
+              <p className="text-sm text-ink-600 leading-relaxed">
+                Check your inbox to confirm your email address, then sign in to access your workspace.
+              </p>
+              <Link href="/login" className="btn-primary w-full py-2.5 inline-block">
+                Sign In to Account
+              </Link>
+            </div>
           </div>
         </main>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
+    <div className="min-h-screen bg-ink-50 flex flex-col">
       <PublicHeader minimal />
-      <main className="auth-page px-4 py-14 sm:py-20">
-        <div className="relative mx-auto max-w-sm">
-        <div className="text-center">
-          <p className="eyebrow">Start securely</p>
-          <h1 className="mt-2 text-2xl font-semibold text-ink-900">Create your account</h1>
-          <p className="mt-2 text-sm text-ink-500">Build a trusted record for every academic submission.</p>
-        </div>
-
-      <form onSubmit={handleSubmit} className="auth-surface mt-8 space-y-4">
-        <div>
-          <label className="label" htmlFor="register-name">Full name</label>
-          <input
-            id="register-name"
-            type="text"
-            placeholder="Jane Doe"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            autoComplete="name"
-            className="input mt-1"
-          />
-        </div>
-        <div>
-          <label className="label" htmlFor="register-email">Email</label>
-          <input
-            id="register-email"
-            type="email"
-            placeholder="you@university.edu"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-            className="input mt-1"
-          />
-        </div>
-        <div>
-          <label className="label">Password</label>
-          <div className="mt-1">
-            <PasswordInput id="register-password" value={password} onChange={setPassword} autoComplete="new-password" />
+      <main className="auth-page flex-1 flex items-center justify-center px-4 py-12 sm:py-16">
+        <div className="relative w-full max-w-md">
+          <div className="text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-600 shadow-lift text-white">
+              <Shield className="h-7 w-7 stroke-[2]" />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-ink-950">Create your account</h1>
+            <p className="mt-1.5 text-sm text-ink-500">Join BlockSubmit to manage verified academic submissions</p>
           </div>
-          <p className="mt-1 text-xs text-ink-300">At least {MIN_PASSWORD_LENGTH} characters.</p>
+
+          <form onSubmit={handleSubmit} className="auth-surface mt-8 space-y-4 bg-white p-6 sm:p-8 rounded-2xl border border-ink-200/80 shadow-popover">
+            <div>
+              <label className="label mb-1" htmlFor="register-name">Full Name</label>
+              <div className="relative flex items-center">
+                <div className="absolute left-3 pointer-events-none text-ink-400">
+                  <User className="h-4 w-4" />
+                </div>
+                <input
+                  id="register-name"
+                  type="text"
+                  placeholder="e.g. Jane Doe"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  autoComplete="name"
+                  required
+                  className="input pl-9 text-sm"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="label mb-1" htmlFor="register-email">Email Address</label>
+              <div className="relative flex items-center">
+                <div className="absolute left-3 pointer-events-none text-ink-400">
+                  <Mail className="h-4 w-4" />
+                </div>
+                <input
+                  id="register-email"
+                  type="email"
+                  placeholder="you@university.edu"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
+                  required
+                  className="input pl-9 text-sm"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="label mb-1">Password</label>
+              <PasswordInput id="register-password" value={password} onChange={setPassword} autoComplete="new-password" />
+              <p className="mt-1 text-[11px] text-ink-400">Must be at least {MIN_PASSWORD_LENGTH} characters.</p>
+            </div>
+
+            <div>
+              <label className="label mb-1">Confirm Password</label>
+              <PasswordInput
+                id="register-confirm-password"
+                value={confirmPassword}
+                onChange={setConfirmPassword}
+                placeholder="Confirm password"
+                autoComplete="new-password"
+              />
+            </div>
+
+            {error && (
+              <div role="alert" className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+                <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className="btn-primary w-full py-2.5 shadow-sm active:scale-[0.98] transition-all"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin text-white" />
+                  <span>Creating Account...</span>
+                </>
+              ) : (
+                <>
+                  <UserPlus className="h-4 w-4" />
+                  <span>Create Student Account</span>
+                </>
+              )}
+            </button>
+          </form>
+
+          <p className="mt-6 text-center text-sm text-ink-500">
+            Already have an account?{' '}
+            <Link href="/login" className="font-semibold text-brand-600 hover:underline">
+              Sign in
+            </Link>
+          </p>
+
+          <Link href="/" className="mt-4 flex items-center justify-center gap-1 text-xs font-semibold text-ink-400 transition-colors hover:text-brand-600">
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Back to home</span>
+          </Link>
+
+          <p className="mt-4 text-center text-[11px] text-ink-400 leading-relaxed">
+            Note: New accounts are registered as students by default. Instructor accounts are provisioned by an administrator.
+          </p>
         </div>
-        <div>
-          <label className="label">Confirm password</label>
-          <div className="mt-1">
-            <PasswordInput
-              id="register-confirm-password"
-              value={confirmPassword}
-              onChange={setConfirmPassword}
-              placeholder="Confirm password"
-              autoComplete="new-password"
-            />
-          </div>
-        </div>
-
-        {error && <p className="text-sm text-red-600">{error}</p>}
-
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full btn-primary"
-        >
-          {submitting ? 'Creating account…' : 'Create account'}
-        </button>
-      </form>
-
-      <p className="mt-4 text-center text-sm text-ink-400">
-        Already have an account?{' '}
-        <Link href="/login" className="font-medium text-ink-900 underline">
-          Log in
-        </Link>
-      </p>
-      <Link href="/" className="mt-5 block text-center text-xs font-medium text-ink-400 transition-colors hover:text-brand-600">
-        ← Back to home
-      </Link>
-      <p className="mt-1 text-center text-xs text-ink-300">
-        New accounts are students by default. Teacher and admin access is granted by an administrator.
-      </p>
-      </div>
       </main>
-    </>
+    </div>
   );
 }
